@@ -1,0 +1,77 @@
+---
+title: "Creating and Managing Private Groups in SimpleX Chat"
+sidebarTitle: "Groups"
+description: "Create end-to-end encrypted private groups in SimpleX Chat. Groups are serverless — members connect directly to each other with no central group server."
+---
+
+SimpleX groups are fully end-to-end encrypted with no central group server. Rather than routing messages through a single hub, every message and file is sent individually to each member over their own direct, encrypted connection. This means the group itself has no central point of compromise — an outsider cannot even confirm that a particular group exists.
+
+## Creating a group
+
+<Steps>
+  <Step title="Start a new group">
+    In the mobile app, tap the **pencil / compose** button and choose **Create secret group**. In the CLI, run `/create group <name>`.
+  </Step>
+  <Step title="Set a group name and image">
+    Enter a **display name** for the group (no spaces recommended for CLI compatibility). Optionally upload a group image. Tap **Create**.
+  </Step>
+  <Step title="Invite members">
+    Open the group, tap the **+** button in the top-right corner, select contacts from your list, and tap **Invite to group**.
+  </Step>
+</Steps>
+
+## Group links
+
+Group links allow anyone to join your group without requiring an existing member to send them a personal invitation.
+
+- Open the group and tap the **group name** at the top.
+- Tap **Create group link**.
+- Share the generated link publicly or with specific people.
+- You can change the **default role** assigned to members who join via the link.
+- Removing or rotating the link does **not** affect existing members — their connections remain active.
+
+Group owners can also set a **welcome message** that is shown to every new member who joins.
+
+## Member roles
+
+| Role | Can invite members | Can remove members | Can change group settings |
+|------|-------------------|-------------------|--------------------------|
+| Owner | Yes | Yes | Yes |
+| Admin | Yes | Yes | No |
+| Moderator | No | No (can block temporarily) | No |
+| Member | No | No | No |
+| Observer | No | No | No |
+
+**Additional notes on roles:**
+
+- **Observer** — Can add reactions, send reports, and use "Chat with admins". Cannot send regular messages.
+- **Moderator** — Can approve members, moderate (delete) messages, and temporarily block members.
+- **Admin** — Can add/remove members, change member roles (up to but not including Owner), and create group links.
+- **Owner** — Full control: can edit the group profile, set preferences, and delete the group.
+
+## Group privacy features
+
+- **No real-identity disclosure** — Members see each other's chosen display names only; no phone number, email, or account identifier is ever shared.
+- **No shared history for new members** — By default, group message history is not sent to newly joined members; they only see messages sent after they joined.
+- **Admin-wide blocking** — Admins can block a disruptive member for all other members simultaneously, not just for themselves.
+- **Group preferences** — The owner can configure disappearing messages, direct messages between members, delete-for-everyone, and voice messages at the group level via **Group preferences**.
+
+## Direct messaging within groups
+
+After joining a group, members can start a private one-to-one conversation with any other member without leaving the group:
+
+1. Tap a **member's name** inside the group conversation.
+2. Tap **Send direct message**.
+
+A separate private chat is created between the two members, completely independent of the group thread.
+
+## CLI group commands
+
+| Command | Description |
+|---------|-------------|
+| `/create group <name>` | Create a new group |
+| `/add <group> <contact> [role]` | Add a contact to a group |
+| `/join <link>` | Join a group via link |
+| `/members <group>` | List group members |
+| `/leave <group>` | Leave a group |
+| `/delete <group>` | Delete a group (owner only) |

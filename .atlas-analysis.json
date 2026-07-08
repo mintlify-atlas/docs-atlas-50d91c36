@@ -1,0 +1,135 @@
+{
+  "projectType": "saas",
+  "projectName": "SimpleX Chat",
+  "projectDescription": "SimpleX is a privacy-first open-source messaging platform with no user identifiers of any kind, offering end-to-end encrypted messaging via a decentralized network of relay servers — with mobile apps, a terminal CLI, and a bot API for developers.",
+  "theme": "luma",
+  "primaryColor": "#18c0f3",
+  "lightColor": "#073786",
+  "darkColor": "#f1f9f9",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Overview",
+        "groups": [
+          {
+            "group": "Introduction",
+            "pages": [
+              "introduction",
+              "why-simplex",
+              "security-and-privacy"
+            ]
+          },
+          {
+            "group": "Getting Started",
+            "pages": [
+              "getting-started/install-mobile",
+              "getting-started/install-cli",
+              "getting-started/making-connections"
+            ]
+          },
+          {
+            "group": "User Guide",
+            "pages": [
+              "guide/send-messages",
+              "guide/groups",
+              "guide/file-transfer",
+              "guide/calls",
+              "guide/chat-profiles",
+              "guide/privacy-settings"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Self-Hosting",
+        "groups": [
+          {
+            "group": "SMP Server",
+            "pages": [
+              "server/smp-overview",
+              "server/smp-install",
+              "server/smp-configuration"
+            ]
+          },
+          {
+            "group": "XFTP Server",
+            "pages": [
+              "server/xftp-overview",
+              "server/xftp-install"
+            ]
+          },
+          {
+            "group": "Advanced",
+            "pages": [
+              "server/tor-setup",
+              "server/webrtc-turn"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Bot Development",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": [
+              "bots/overview",
+              "bots/quickstart-nodejs",
+              "bots/quickstart-python"
+            ]
+          },
+          {
+            "group": "API Reference",
+            "pages": [
+              "bots/api-commands",
+              "bots/api-events",
+              "bots/api-types"
+            ]
+          },
+          {
+            "group": "Client Libraries",
+            "pages": [
+              "bots/typescript-client",
+              "bots/python-client",
+              "bots/nodejs-client"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "No user identifiers of any kind — not even random IDs or public keys assigned to users",
+    "Double ratchet E2E encryption with an additional NaCl crypto_box layer",
+    "Decentralized network of SMP relay servers — self-host or use pre-configured servers",
+    "XFTP protocol for metadata-protected, chunked, multi-recipient file transfer",
+    "Mobile apps (iOS and Android), multiplatform desktop, and terminal CLI",
+    "Incognito mode generates a unique random profile per contact",
+    "Bot API via WebSocket JSON interface with TypeScript, Python, and Node.js SDKs",
+    "TLS 1.3 transport encryption with optional Tor integration",
+    "Local SQLite (or PostgreSQL) encrypted chat database",
+    "Audited by Trail of Bits (2022 and 2024)"
+  ],
+  "publicApiSurface": [
+    "ChatClient.create(server, config) — TypeScript/Node.js SDK entry point",
+    "ChatClient.sendChatCmd(cmd) — send a raw CLI command over WebSocket",
+    "ChatClient.apiGetActiveUser() — get active user profile",
+    "ChatClient.apiCreateActiveUser(profile) — create a new user profile",
+    "ChatClient.apiSendTextMessage(chatType, chatId, text) — send a text message",
+    "ChatClient.apiSendMessages(chatType, chatId, messages) — send multiple messages",
+    "ChatClient.apiUpdateChatItem(...) — edit a sent message",
+    "ChatClient.apiDeleteChatItems(...) — delete chat items",
+    "ChatClient.enableAddressAutoAccept() — auto-accept incoming contact requests",
+    "ChatClient.apiGetUserAddress() / apiCreateUserAddress() — manage contact address",
+    "bot.on_message(content_type, text) — Python decorator for message handlers",
+    "bot.on_command(name) — Python decorator for slash-command handlers",
+    "bot.on_event(tag) — Python decorator for raw event handlers",
+    "bot.run() — Python: start the bot and block",
+    "WebSocket JSON protocol: {corrId, cmd} request / {corrId, resp} response",
+    "ChatCommand ADT (Haskell) — APICreateMyAddress, APISendMessages, APIAddMember, etc.",
+    "ChatEvent types — NewChatItems, ContactConnected, ReceivedGroupInvitation, RcvFileComplete, etc.",
+    "simplex-chat CLI flags: -p (WebSocket port), --command, --store-log, --db-file-prefix",
+    "smp-server init / xftp-server init — server initialization commands",
+    "smp-server start / xftp-server start — server startup commands"
+  ]
+}

@@ -1,0 +1,134 @@
+---
+title: "Set Up a Custom STUN/TURN Server for SimpleX Calls"
+sidebarTitle: "WebRTC TURN"
+description: "Deploy coturn as a STUN/TURN server to enable private audio and video calls in SimpleX without revealing your IP address to contacts."
+---
+
+By default, SimpleX uses public STUN servers to negotiate the peer-to-peer WebRTC connection used for audio and video calls. During this NAT traversal process your public IP address is revealed to your contact. A self-hosted **TURN server** acts as a media relay — both parties send and receive call media through your server rather than establishing a direct connection, which means neither party ever learns the other's real IP address.
+
+## Prerequisites
+
+Before deploying coturn, ensure you have:
+
+- A **domain name** pointed at your server (e.g. `turn.example.com`).
+- **Ports 443 and 3478** open in your firewall, as well as the relay port range **49152–65535** (both TCP and UDP).
+- A valid **TLS certificate** for your domain — [Let's Encrypt](https://letsencrypt.org/getting-started/) is recommended. Certbot or Caddy can handle automatic renewal.
+
+## Install coturn
+
+<Steps>
+  <Step title="Install the coturn package">
+    ```sh
+    apt update && apt install coturn
+    ```
+  </Step>
+  <Step title="Enable the coturn service">
+    The coturn service is disabled by default. Enable it by uncommenting the relevant line in `/etc/default/coturn`:
+
+    ```
+    TURNSERVER_ENABLED=1
+    ```
+
+    You can do this with a text editor, or with:
+
+    ```sh
+    sed -i '/TURN/s/^#//g' /etc/default/coturn
+    ```
+  </Step>
+  <Step title="Configure /etc/turnserver.conf">
+    Replace the contents of `/etc/turnserver.conf` with the following. Substitute `myuser`, `mypassword`, and `turn.example.com` with your own values:
+
+    ```conf
+    # Also listen on port 443 for TLS (can bypass restrictive firewalls)
+    tls-listening-port=443
+    alt-tls-listening-port=5349
+    # Include fingerprints in TURN messages
+    fingerprint
+    # Use long-term credentials mechanism
+    lt-cred-mech
+    # Credentials for TURN authentication
+    user=myuser:mypassword
+    # Server domain
+    realm=turn.example.com
+    # TLS certificate and private key
+    cert=/etc/letsencrypt/live/turn.example.com/fullchain.pem
+    pkey=/etc/letsencrypt/live/turn.example.com/privkey.pem
+    # Use a 2066-bit predefined DH TLS key
+    dh2066
+    # Disable weak TLS versions
+    no-tlsv1
+    no-tlsv1_1
+    no-tlsv1_2
+    # Log to the systemd journal
+    syslog
+    ```
+  </Step>
+  <Step title="Open firewall ports">
+    Allow the ports coturn needs:
+
+    ```sh
+    sudo ufw allow 443/tcp
+    sudo ufw allow 3478
+    sudo ufw allow 5349
+    sudo ufw allow 49152:65535/tcp
+    sudo ufw allow 49152:65535/udp
+    ```
+  </Step>
+  <Step title="Enable and start coturn">
+    ```sh
+    systemctl enable --now coturn
+    ```
+
+    Verify that the service is running:
+
+    ```sh
+    systemctl status coturn
+    ```
+  </Step>
+</Steps>
+
+<Warning>
+  Change the default `user:password` credentials before deploying your TURN server publicly. Anyone who obtains your credentials can use your server as a relay, which may result in unexpected bandwidth costs and resource exhaustion. Use a strong, randomly generated password.
+</Warning>
+
+## Add your TURN server to SimpleX
+
+Once coturn is running, configure the SimpleX app to use it for calls:
+
+1. Open **Settings** → **Network & servers** → **WebRTC ICE servers**.
+2. Enable the **Configure ICE servers** toggle.
+3. Add your server addresses in the text field, one per line:
+
+   ```
+   stun:turn.example.com:5349
+   turn:myuser:mypassword@turn.example.com:443
+   ```
+
+   Using port `443` for TURN is recommended — it is the most likely to work through corporate firewalls and NAT devices.
+
+<Note>
+  You can add both a STUN line and a TURN line for the same server. The STUN entry allows direct peer-to-peer connections when possible; the TURN entry is used as a fallback relay when a direct connection cannot be established.
+</Note>
+
+## Privacy benefits
+
+Deploying your own TURN server provides several meaningful privacy improvements over the default public STUN configuration:
+
+- **Your IP is hidden from your contact** — all call media flows through your TURN server rather than directly between devices, so neither party's real IP is exposed during the call.
+- **Your contact's IP is hidden from you** — the relay is symmetric; your server sees both ends but neither participant sees the other.
+- **Media passes through infrastructure you control** — call audio and video are relayed by your server rather than any third-party infrastructure.
+- **No third-party involvement** — once configured, SimpleX calls use only your TURN server and the SMP relay for key exchange; no SimpleX Chat Ltd. infrastructure is involved in the call itself.
+
+## Troubleshooting
+
+To verify that your TURN server is reachable and correctly configured:
+
+```sh
+# Check that ports are open
+nc -zvw10 turn.example.com 443 5349
+
+# Stream coturn logs
+journalctl -u coturn -f
+```
+
+For an end-to-end connectivity test, use the [IceTest](https://icetest.info/) web tool — add your STUN and TURN server addresses and run the test. A successful result will show both `srflx` (STUN) and `relay` (TURN) candidates in the results.

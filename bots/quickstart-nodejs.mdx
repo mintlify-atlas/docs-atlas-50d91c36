@@ -1,0 +1,176 @@
+---
+title: "Build a SimpleX Bot with the Node.js SDK"
+sidebarTitle: "Node.js Quickstart"
+description: "Create a SimpleX bot using the Node.js SDK in under 20 lines. The SDK manages the WebSocket connection, message queuing, and TypeScript types automatically."
+---
+
+The Node.js SDK (`simplex-chat` on npm) gives you two levels of control. The high-level `bot.run()` API handles profile creation, address setup, and event dispatch in a single declarative call. The lower-level `ChatClient` class exposes the full WebSocket API — every command and event — for bots that need fine-grained control over connections, groups, files, or multiple user profiles.
+
+## Prerequisites
+
+- Node.js 18 or later
+- The `simplex-chat` CLI binary available in `PATH` (or specify the path explicitly in `dbOpts`)
+
+## Install
+
+```sh
+npm install simplex-chat
+```
+
+For the PostgreSQL backend on Linux x86_64:
+
+```sh
+npm install simplex-chat --simplex_backend=postgres
+```
+
+You can also persist the backend choice in `.npmrc`:
+
+```ini
+simplex_backend=postgres
+```
+
+## Quick start: echo bot
+
+<Steps>
+  <Step title="Create bot.js">
+    ```javascript bot.js
+    const {bot} = require('simplex-chat')
+
+    bot.run({
+      profile: {displayName: 'Echo Bot', fullName: ''},
+      dbOpts: {type: 'sqlite', filePrefix: './echo_bot'},
+      onMessage: async (ci, content) => {
+        await ci.reply(content.text)
+      }
+    })
+    ```
+  </Step>
+  <Step title="Start the bot">
+    ```sh
+    node bot.js
+    ```
+
+    On first run, the native `libsimplex` library is downloaded and verified. On macOS this may take 20–30 seconds for Gatekeeper verification.
+  </Step>
+  <Step title="Connect to your bot">
+    The bot prints its SimpleX contact address to stdout on startup:
+
+    ```
+    Bot address: simplex:/contact#...
+    ```
+
+    Paste this address into any SimpleX Chat app to connect and start chatting.
+  </Step>
+</Steps>
+
+## Database configuration
+
+The `dbOpts` field accepts a `DbConfig` discriminated union — choose the variant that matches the backend you installed:
+
+```typescript
+// SQLite (default) — works on all platforms
+{type: 'sqlite', filePrefix: './bot-data/bot'}
+// optional: encryptionKey: 'sqlcipher-passphrase'
+
+// PostgreSQL — Linux x86_64 only
+{type: 'postgres', connectionString: 'postgresql://user:pass@localhost/botdb'}
+// optional: schemaPrefix: 'bot_'  (defaults to 'simplex_v1')
+```
+
+PostgreSQL prerequisites:
+- `libpq5` must be installed (`apt install libpq5` on Debian/Ubuntu)
+- A running PostgreSQL server reachable via the connection string
+
+## Handling events
+
+`bot.run()` accepts several options to control connection behaviour and message handling:
+
+```javascript
+const {bot} = require('simplex-chat')
+
+bot.run({
+  profile: {displayName: 'Help Bot', fullName: 'Help Bot v1'},
+  dbOpts: {type: 'sqlite', filePrefix: './help_bot'},
+  options: {
+    addressSettings: {
+      welcomeMessage: 'Welcome! Type /help to see available commands.',
+    },
+  },
+  onMessage: async (ci, content) => {
+    const text = content?.text ?? ''
+    if (text === '/help') {
+      await ci.reply('Available commands:\n/help — show this message\n/about — about this bot')
+    } else if (text === '/about') {
+      await ci.reply('Help Bot v1 — built with the SimpleX Node.js SDK.')
+    } else {
+      await ci.reply(`Unknown command. Type /help for a list of commands.`)
+    }
+  },
+})
+```
+
+The `onMessage` callback receives two arguments:
+
+| Argument | Type | Description |
+|---|---|---|
+| `ci` | `AChatItem` | The full chat item, including `chatInfo` and `chatItem.meta` |
+| `content` | `MsgContent` | Shorthand for `ci.chatItem.content.msgContent` — the message payload |
+
+The `reply` method on `ci` sends a text message back to the same chat (direct or group).
+
+## Squaring bot: using ChatClient directly
+
+For full control, use `ChatClient` from `simplex-chat`. This is the underlying client used by `bot.run()` internally:
+
+```javascript
+const {ChatClient} = require('simplex-chat')
+const {ChatType} = require('simplex-chat/dist/command')
+const {ciContentText, ChatInfoType} = require('simplex-chat/dist/response')
+
+async function run() {
+  const chat = await ChatClient.create('ws://localhost:5225')
+  const user = await chat.apiGetActiveUser()
+  if (!user) {
+    console.log('No user profile — create one via the CLI first')
+    return
+  }
+  console.log(`Bot: ${user.profile.displayName}`)
+
+  const address =
+    (await chat.apiGetUserAddress(user.userId)) ||
+    (await chat.apiCreateUserAddress(user.userId))
+  console.log(`Address: ${address}`)
+
+  await chat.enableAddressAutoAccept(user.userId)
+
+  for await (const resp of chat.msgQ) {
+    const r = resp instanceof Promise ? await resp : resp
+    if (r.type === 'contactConnected') {
+      await chat.apiSendTextMessage(
+        ChatType.Direct,
+        r.contact.contactId,
+        'Hello! Send me a number and I will square it.'
+      )
+    } else if (r.type === 'newChatItems') {
+      for (const {chatInfo, chatItem} of r.chatItems) {
+        if (chatInfo.type !== ChatInfoType.Direct) continue
+        const msg = ciContentText(chatItem.content)
+        if (msg) {
+          const n = +msg
+          const reply =
+            typeof n === 'number' && !isNaN(n)
+              ? `${n} * ${n} = ${n * n}`
+              : 'That is not a number.'
+          await chat.apiSendTextMessage(ChatType.Direct, chatInfo.contact.contactId, reply)
+        }
+      }
+    }
+  }
+}
+
+run()
+```
+
+<Tip>
+For advanced use cases — handling file events, group invitations, custom command routing, or managing multiple user profiles — use `ChatClient` directly. It exposes typed wrappers for every WebSocket API command. See the [Commands reference](/bots/api-commands) and [Events reference](/bots/api-events) for the full list.
+</Tip>

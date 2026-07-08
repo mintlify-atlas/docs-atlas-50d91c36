@@ -1,0 +1,85 @@
+---
+title: "Managing Chat Profiles and Incognito Mode in SimpleX"
+sidebarTitle: "Chat Profiles"
+description: "SimpleX supports multiple local chat profiles and Incognito mode — which auto-generates a unique random name for each new contact to prevent tracking."
+---
+
+SimpleX Chat stores all profiles exclusively on your device — no profile data, display name, or avatar is ever sent to or stored on any server permanently. You can create as many profiles as you like, each with its own independent set of contacts, groups, and message database.
+
+## Creating a chat profile
+
+<Steps>
+  <Step title="Open app settings">
+    Tap your **profile image / avatar** in the upper-left corner of the screen, then tap **Settings** (or your current profile name if you have multiple profiles).
+  </Step>
+  <Step title="Go to Your chat profiles">
+    Tap **Your chat profiles**. Authenticate with fingerprint or PIN if SimpleX Lock is enabled.
+  </Step>
+  <Step title="Add a new profile">
+    Tap **+ Add profile**. Enter a **display name** (no spaces; latin characters and numbers are recommended for CLI compatibility) and optionally a full name.
+  </Step>
+  <Step title="Create the profile">
+    Tap **Create**. The new profile is immediately available and fully isolated from your other profiles.
+  </Step>
+</Steps>
+
+Each profile maintains its own:
+- Contact list and conversation history
+- Group memberships
+- Relay server configuration (stored in the shared database but addressable per profile)
+- Incognito mode setting
+
+## Switching profiles
+
+1. Tap your **avatar in the top-left** corner of the main screen.
+2. Select the profile you want to switch to from the list.
+
+You can also switch via **Settings → Your chat profiles**. Profiles are fully isolated — switching profiles does not share any data between them.
+
+## Incognito mode
+
+Incognito mode is unique to SimpleX Chat. Unlike creating a separate account, it operates **per-connection** within any profile, generating a fresh random display name for each new contact or group you join.
+
+**How it works:**
+
+- When Incognito mode is **on**, your real profile name and avatar are **not shared** with new contacts.
+- A new **random display name** is generated automatically for each new contact or group you connect to.
+- That random name is used only for that specific contact — they cannot link your conversations with other contacts or your real profile.
+- Existing contacts who already know your real profile name are unaffected.
+
+**To toggle Incognito mode:**
+
+1. Open **Settings**.
+2. Tap the toggle next to **Incognito**.
+
+<Note>
+  Incognito mode is unique to SimpleX — no other major messaging platform allows per-contact pseudonyms without creating an entirely separate account.
+</Note>
+
+## Hidden profiles
+
+You can password-protect any profile so that it does not appear in the profile switcher unless the correct password is entered. This is useful for maintaining a discreet profile on a shared or inspected device.
+
+**To hide a profile:**
+
+- In the **Your chat profiles** list, long-press (Android) or swipe (iOS) the profile.
+- Choose **Hide profile** and set a password.
+
+**To reveal a hidden profile:**
+
+- In the profile switcher or **Your chat profiles** screen, type the profile's full password in the **search bar**.
+- The hidden profile will appear and can be unlocked.
+
+You can also **mute** a profile (suppress notifications for it) using the same long-press / swipe menu.
+
+## Profile data
+
+| Data | Stored where | Shared with contacts? |
+|------|--------------|-----------------------|
+| Display name | Your device (chat database) | Yes — sent to contacts on connect or profile update |
+| Full name | Your device (chat database) | Yes — if provided |
+| Avatar image | Your device (chat database) | Yes — sent to contacts |
+| Message history | Your device only | No |
+| Server addresses | Your device only | No |
+
+When you update your profile, the new name and avatar are pushed to all existing contacts (except those connected via an incognito random name). Profile data is included in your **database export** and moves with it when you migrate to a new device.

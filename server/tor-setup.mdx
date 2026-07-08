@@ -1,0 +1,186 @@
+---
+title: "Configure Tor for Your SMP Server and SimpleX Apps"
+sidebarTitle: "Tor Setup"
+description: "Add a .onion address to your SMP server and configure SimpleX apps to route traffic through Tor for stronger anonymity and censorship resistance."
+---
+
+Tor integration in SimpleX works in two complementary ways: you can expose your SMP server on a `.onion` address so that clients connecting via Tor never touch the clearnet, and you can configure the SimpleX client itself to route all SMP traffic through Tor for stronger anonymity. Both approaches can be combined and are independent of each other.
+
+## Adding a .onion address to your SMP server
+
+<Steps>
+  <Step title="Install Tor from the official repository">
+    The Tor Project maintains a Debian/Ubuntu PPA with up-to-date packages. Run the following as `root`:
+
+    ```sh
+    CODENAME="$(lsb_release -c | awk '{print $2}')"
+    echo "deb [signed-by=/usr/share/keyrings/tor-archive-keyring.gpg] https://deb.torproject.org/torproject.org ${CODENAME} main
+    deb-src [signed-by=/usr/share/keyrings/tor-archive-keyring.gpg] https://deb.torproject.org/torproject.org ${CODENAME} main" \
+      > /etc/apt/sources.list.d/tor.list
+
+    curl --proto '=https' --tlsv1.2 -sSf \
+      https://deb.torproject.org/torproject.org/A3C4F0F979CAA22CDBA8F512EE8CBC9E886DDD89.asc \
+      | gpg --dearmor | tee /usr/share/keyrings/tor-archive-keyring.gpg >/dev/null
+
+    apt update && apt install -y tor deb.torproject.org-keyring
+    ```
+
+    If you are not on a Debian/Ubuntu based distribution, refer to the [official Tor installation documentation](https://community.torproject.org/onion-services/setup/install/).
+  </Step>
+  <Step title="Configure /etc/tor/torrc for the hidden service">
+    Open the Tor configuration file:
+
+    ```sh
+    vim /etc/tor/torrc
+    ```
+
+    Append the following lines. The single-hop routing options reduce latency at the cost of server anonymity — this is acceptable because the onion address is published alongside the clearnet address in client configurations:
+
+    ```
+    # Enable log so that Tor creates the onion address on first start
+    Log notice file /var/log/tor/notices.log
+    # Single-hop routing: reduces latency; fine when onion is paired with a public address
+    SOCKSPort 0
+    HiddenServiceNonAnonymousMode 1
+    HiddenServiceSingleHopMode 1
+    # SMP server hidden service: directory and port mappings
+    HiddenServiceDir /var/lib/tor/simplex-smp/
+    HiddenServicePort 5223 localhost:5223
+    HiddenServicePort 443 localhost:443
+    ```
+
+    Then create the hidden service directory and set correct ownership:
+
+    ```sh
+    mkdir /var/lib/tor/simplex-smp/
+    chown debian-tor:debian-tor /var/lib/tor/simplex-smp/
+    chmod 700 /var/lib/tor/simplex-smp/
+    ```
+  </Step>
+  <Step title="Restart Tor and retrieve the onion hostname">
+    Enable and start (then restart, as Tor can be flaky on its very first start):
+
+    ```sh
+    systemctl enable --now tor && systemctl restart tor
+    ```
+
+    Once Tor has initialised the hidden service, print the onion address:
+
+    ```sh
+    cat /var/lib/tor/simplex-smp/hostname
+    ```
+
+    You will see a `.onion` address like `abcdef1234567890.onion`. Keep this value — you will need it in the next step.
+  </Step>
+  <Step title="Update smp-server.ini with the onion hostname">
+    Open the SMP server configuration:
+
+    ```ini
+    vim /etc/opt/simplex/smp-server.ini
+    ```
+
+    In the `[TRANSPORT]` section, add your onion address alongside your clearnet hostname:
+
+    ```ini
+    [TRANSPORT]
+    host: smp.example.com,abcdef1234567890.onion
+    port: 5223,443
+    ```
+  </Step>
+  <Step title="Restart smp-server">
+    Apply the new configuration:
+
+    ```sh
+    systemctl restart smp-server
+    ```
+
+    The server will now print both addresses on startup. The full combined server address takes the form:
+
+    ```
+    smp://fingerprint@smp.example.com,abcdef1234567890.onion
+    ```
+
+    Clients that connect via Tor will automatically prefer the `.onion` address; all others will use the clearnet hostname.
+  </Step>
+</Steps>
+
+## Configuring a second Tor instance for SMP PROXY
+
+SMP servers (v5.8.0 and later) support a built-in **SMP PROXY** that forwards messages destined for onion-only servers, making them accessible to clients that do not use Tor themselves. This proxy uses a dedicated outbound SOCKS5 connection to the Tor network on a separate port so it does not conflict with the hidden service instance.
+
+<Steps>
+  <Step title="Create a second Tor daemon instance">
+    ```sh
+    tor-instance-create tor2
+    ```
+  </Step>
+  <Step title="Configure the tor2 instance">
+    ```sh
+    vim /etc/tor/instances/tor2/torrc
+    ```
+
+    Replace the file contents with:
+
+    ```
+    # Log to systemd journal
+    Log notice syslog
+    # Provide a local SOCKS5 proxy on port 9050
+    SocksPort 9050
+    ```
+  </Step>
+  <Step title="Enable and start tor2">
+    ```sh
+    systemctl enable --now tor@tor2
+    ```
+  </Step>
+  <Step title="Configure smp-server to use the SOCKS proxy">
+    In `/etc/opt/simplex/smp-server.ini`, configure the `[PROXY]` section:
+
+    ```ini
+    [PROXY]
+    socks_proxy: 127.0.0.1:9050
+    own_server_domains: example.com
+    ```
+
+    Restart smp-server to apply:
+
+    ```sh
+    systemctl restart smp-server
+    ```
+  </Step>
+</Steps>
+
+## Using Tor in the SimpleX app (client-side)
+
+You can route SimpleX client traffic through Tor without any changes to your server. This hides your IP address from SMP relay operators.
+
+<Tabs>
+  <Tab title="Android">
+    1. Install [Orbot](https://guardianproject.info/apps/org.torproject.android/) from F-Droid or the Play Store.
+    2. Start Orbot and ensure Tor is connected.
+    3. In SimpleX: **Settings** → **Network & servers** → **Use SOCKS proxy** → enable and set the address to `localhost:9050`.
+    4. Optionally enable **Transport isolation** (see below) to assign a separate circuit per contact.
+  </Tab>
+  <Tab title="iOS">
+    1. Install [Orbot](https://apps.apple.com/app/orbot/id1609461078) from the App Store.
+    2. Enable Orbot's **VPN mode** — this routes all device traffic through Tor at the OS level.
+    3. SimpleX will automatically route its SMP connections through the Tor VPN tunnel; no additional configuration is needed inside the app.
+  </Tab>
+  <Tab title="Desktop / CLI">
+    Ensure a Tor SOCKS proxy is running locally (e.g. the `tor` package provides one on `localhost:9050` by default), then start `simplex-chat` with the proxy flag:
+
+    ```sh
+    simplex-chat --socks-proxy=localhost:9050
+    ```
+  </Tab>
+</Tabs>
+
+## Transport isolation with Tor
+
+When **transport isolation** is enabled in the SimpleX app alongside a SOCKS proxy, each contact's SMP connection is routed through a **separate Tor circuit**. This prevents relay servers from correlating traffic across your contacts — even if a relay operator monitors connection patterns, they cannot determine that two different circuits belong to the same user.
+
+To enable it on Android and desktop: **Settings** → **Network & servers** → **Transport isolation** → turn on.
+
+<Info>
+  Tor adds latency to every message and file transfer. For best user experience, consider enabling Tor selectively — for contacts in high-risk environments or where network-level anonymity is essential — rather than globally for all conversations.
+</Info>

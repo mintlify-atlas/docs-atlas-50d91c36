@@ -1,0 +1,120 @@
+---
+title: "Building Bots on the SimpleX Network"
+sidebarTitle: "Overview"
+description: "SimpleX bots are first-class network participants. Connect via WebSocket JSON API and build customer support, broadcast, moderation, or LLM-powered bots."
+---
+
+A SimpleX bot is a full participant of the SimpleX network — not a limited integration, but a complete peer. It can send and receive messages, connect to user addresses, join and manage groups, transfer files, and do everything a regular SimpleX Chat user can do. Bots run as standalone processes and communicate with the SimpleX Chat CLI over a local WebSocket connection using a simple JSON API.
+
+## How it works
+
+The bot architecture has three parts: the SimpleX Chat CLI acting as a server, your bot process as a client, and the SimpleX network itself.
+
+1. **Start the CLI as a WebSocket server** on a local port:
+   ```sh
+   simplex-chat -p 5225
+   ```
+
+2. **Your bot connects** to `ws://localhost:5225` over WebSocket.
+
+3. **Your bot sends commands** as JSON with a correlation ID:
+   ```json
+   {"corrId": "1", "cmd": "/_address 1"}
+   ```
+
+4. **The CLI responds** with the same correlation ID in the `resp` envelope:
+   ```json
+   {"corrId": "1", "resp": {"type": "userContactLinkCreated", "connLinkContact": {"connFullLink": "simplex:/contact#..."}}}
+   ```
+
+5. **Unsolicited events** (incoming messages, new connections, group changes) arrive without a `corrId`:
+   ```json
+   {"resp": {"type": "newChatItems", "user": {...}, "chatItems": [...]}}
+   ```
+
+Your bot maintains a map of pending `corrId` values to match responses to their commands. The TypeScript and Python SDKs handle this automatically. For most bots, the loop is simple: listen for `newChatItems` events and reply using `APISendMessages`.
+
+## Use cases
+
+<CardGroup cols={2}>
+  <Card title="Customer Support" icon="headset">
+    Accept requests via a business address. Each connecting user gets a private group chat. Invite human agents as needed.
+  </Card>
+  <Card title="Broadcast / Announcement" icon="megaphone">
+    Forward messages from trusted authors to all connected contacts. Used by the official SimpleX Status bot.
+  </Card>
+  <Card title="LLM / AI Assistant" icon="robot">
+    Proxy user messages to an LLM backend and stream the reply back. Stateful conversation context per contact.
+  </Card>
+  <Card title="Group Moderation" icon="shield-check">
+    Monitor group messages, remove spam, assign roles, block members, or enforce community rules automatically.
+  </Card>
+  <Card title="Equipment / IoT Control" icon="microchip">
+    Issue commands to servers or home automation devices via SimpleX's end-to-end encrypted, authenticated connections.
+  </Card>
+  <Card title="Automated File Delivery" icon="file-arrow-down">
+    Distribute files to users on demand. The bot sends files as message attachments using `APISendMessages`.
+  </Card>
+</CardGroup>
+
+## Starting the WebSocket server
+
+Run the SimpleX Chat CLI with the `-p` flag to listen on a port:
+
+```sh
+simplex-chat -p 5225
+```
+
+To use a dedicated database (recommended for bots so the bot profile is separate from your personal profile):
+
+```sh
+simplex-chat -p 5225 --db-file-prefix /path/to/bot-db
+```
+
+To see all supported CLI flags:
+
+```sh
+simplex-chat -h
+```
+
+<Note>
+The CLI binds the WebSocket server to `localhost` only by default. Your bot and the CLI must run on the same machine unless you configure a secure proxy (see [Security](#security) below).
+</Note>
+
+## Bot profile type
+
+Starting from v6.4.3, SimpleX apps can distinguish bots from human users. Setting `peerType: "bot"` in a user profile signals to contacts that they are talking with a bot. The apps display bot profiles differently and can show command menus.
+
+You can configure the bot profile in several ways:
+
+- **CLI flags at first start**: use `--create-bot-display-name` and `--create-bot-allow-files` when first creating the database.
+- **CLI command**: use `/create bot [files=on] <name> [<bio>]` to create additional bot profiles in an existing database.
+- **Bot command menus**: use `/set bot commands` to configure the command menu shown in the app when users type `/`:
+  ```
+  /set bot commands 'Help':/help,'Show groups':/list,'Settings':{'Set role':/'role <ID>'}
+  ```
+- **API**: use [APIUpdateProfile](/bots/api-commands#apiupdateprofile) to set `peerType: "bot"` and configure bot commands programmatically at the same time.
+
+Configured commands are highlighted in the chat UI and tappable by users. Commands with parameters use single-quote wrapping (`/'role 2'`) so the app displays them without quotes but sends them verbatim when tapped.
+
+## Security
+
+<Warning>
+The WebSocket API has **no authentication**. Always bind to `localhost` only (the default). Never expose port 5225 directly to a public network.
+
+If your bot must run on a different machine, use a TLS-terminating reverse proxy (Caddy or Nginx) with HTTP Basic Auth in front of the CLI port. Validate your TLS configuration at [SSLLabs.com](https://www.ssllabs.com/ssltest/) before going live. You can also restrict the firewall to allow only your bot's IP address.
+</Warning>
+
+## Available SDKs
+
+<CardGroup cols={3}>
+  <Card title="Node.js SDK" icon="node-js" href="/bots/quickstart-nodejs">
+    High-level `bot.run()` API and a lower-level `ChatClient` for full event-loop control. Published as `simplex-chat` on npm.
+  </Card>
+  <Card title="Python SDK" icon="python" href="/bots/quickstart-python">
+    Decorator-based message and event handlers. Published as `simplex-chat` on PyPI. Wire types are auto-generated from Haskell source.
+  </Card>
+  <Card title="TypeScript Client" icon="code" href="/bots/api-commands">
+    The underlying `ChatClient` class used by both SDKs. Full typed access to every WebSocket API command and event.
+  </Card>
+</CardGroup>

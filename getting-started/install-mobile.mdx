@@ -1,0 +1,90 @@
+---
+title: "Install SimpleX Chat on iOS and Android"
+sidebarTitle: "Mobile App"
+description: "Download SimpleX Chat for iOS or Android. No account, phone number, or email required — just create a local display name to get started."
+---
+
+SimpleX Chat requires no account, phone number, email address, or any other identifier to get started. When you first open the app, you simply enter a **display name** — a local alias used only on your device to identify yourself to your contacts. That name is never registered on any server and can be anything you like.
+
+<Note>
+  Your display name is stored only on your device. It is never sent to any SimpleX server and does not uniquely identify you on the network. If two of your contacts happen to choose the same display name, the app automatically appends a numeric suffix to distinguish them locally.
+</Note>
+
+## Download the app
+
+<Tabs>
+  <Tab title="iOS">
+    Install the stable release from the App Store, or join the TestFlight beta to get new features one to two weeks before the stable release.
+
+    <CardGroup cols={2}>
+      <Card title="App Store" icon="apple" href="https://apps.apple.com/us/app/simplex-chat/id1605771084">
+        Stable release for all iPhones and iPads.
+      </Card>
+      <Card title="TestFlight Beta" icon="flask" href="https://testflight.apple.com/join/DWuT2LQu">
+        Preview builds — limited to 10,000 users. Requires Apple's TestFlight app.
+      </Card>
+    </CardGroup>
+  </Tab>
+  <Tab title="Android">
+    Choose the distribution channel that fits your needs. F-Droid and direct APK downloads do not require a Google account.
+
+    <CardGroup cols={3}>
+      <Card title="Google Play" icon="google-play" href="https://play.google.com/store/apps/details?id=chat.simplex.app">
+        Automatic updates via the Play Store.
+      </Card>
+      <Card title="F-Droid" icon="f-droid" href="https://simplex.chat/fdroid/">
+        Fully open-source build, no Google services required.
+      </Card>
+      <Card title="Direct APK" icon="android" href="https://github.com/simplex-chat/simplex-chat/releases/latest/download/simplex-aarch64.apk">
+        Latest release APK from GitHub (aarch64). An armv7a build is also available on the releases page.
+      </Card>
+    </CardGroup>
+
+    You can [verify and reproduce](https://github.com/simplex-chat/simplex-chat/blob/stable/docs/REPRODUCE.md) Android APK builds from the published source.
+  </Tab>
+</Tabs>
+
+## First launch
+
+<Steps>
+  <Step title="Open the app">
+    Launch SimpleX Chat after installation. You will be greeted by the onboarding screen — no sign-in or sign-up flow exists.
+  </Step>
+  <Step title="Enter your display name">
+    Type a display name (required) and an optional full name. Tap **Create profile**. This creates a local chat profile stored only on your device.
+  </Step>
+  <Step title="Choose a notifications mode">
+    The app will prompt you to select how push notifications are delivered. On **iOS** this is a trade-off between convenience and privacy — instant notifications share slightly more metadata with notification relay servers. On **Android** it is a trade-off between notification delay and battery life. You can change this setting later in app settings.
+  </Step>
+  <Step title="Connect to the developers (optional)">
+    On your first launch a **Chat with the developers** button appears at the bottom of the empty conversations list. Tap it to send test messages or ask questions about the app. This button disappears once you make your first connection; afterwards you can reach the team via **Settings → Send questions and ideas**.
+  </Step>
+  <Step title="Start chatting">
+    You are ready. Tap the pencil icon (iOS: top-right corner; Android: floating button, bottom-right) to create a one-time invitation link and share it with a friend to make your first private connection.
+  </Step>
+</Steps>
+
+## What gets stored locally
+
+All messages, contacts, and groups are stored in a **local SQLite database** on your device — nothing is persisted on any server. The database is encrypted with a random passphrase that is itself stored in a secure system vault:
+
+- **iOS** — passphrase stored in the system **Keychain**.
+- **Android** — passphrase stored in the **Keystore**.
+
+Relay servers (SMP servers) hold only in-transit, end-to-end encrypted message payloads. Once a message is delivered, the server deletes it. Servers never see message content, sender identity, or recipient identity.
+
+<Warning>
+  If you uninstall the app or lose your device without a backup, your messages and contacts are permanently lost — there is no server-side recovery. Export a chat database backup regularly via **Settings → Database passphrase & export**.
+</Warning>
+
+## Desktop app
+
+A multiplatform desktop app is available for **Linux**, **macOS**, and **Windows** as a free download from the [GitHub releases page](https://github.com/simplex-chat/simplex-chat/releases).
+
+| Platform | Formats available |
+|---|---|
+| Linux | AppImage (x86\_64, aarch64), Flatpak, `.deb` for Ubuntu 22.04 and 24.04 |
+| macOS | `.dmg` for Intel (x86\_64) and Apple Silicon (aarch64) |
+| Windows | `.msi` installer (x86\_64) |
+
+You can link your mobile device with the desktop app to use the same profile remotely, but both devices must be connected to the **same local network** at the time of linking.

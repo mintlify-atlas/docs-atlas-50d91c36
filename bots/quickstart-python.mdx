@@ -1,0 +1,159 @@
+---
+title: "Build a SimpleX Bot with the Python SDK"
+sidebarTitle: "Python Quickstart"
+description: "Create a SimpleX bot in Python using decorator-based message handlers. Install simplex-chat from PyPI — the native library is downloaded automatically on first run."
+---
+
+The Python SDK (`simplex-chat` on PyPI) provides a decorator-based API for message and event handling, equivalent in capability to the Node.js SDK. Register handlers with `@bot.on_message()`, `@bot.on_command()`, or `@bot.on_event()`, then call `bot.run()` to start the event loop. Wire types in `simplex_chat.types` are auto-generated from the same Haskell source as the TypeScript types, so they match exactly what the WebSocket API sends.
+
+## Requirements
+
+- Python 3.11 or later
+- pip
+
+## Install
+
+<Steps>
+  <Step title="Install the package">
+    ```sh
+    pip install simplex-chat
+    ```
+  </Step>
+  <Step title="Pre-fetch the native library (optional but recommended)">
+    ```sh
+    # SQLite backend (default, all platforms)
+    python -m simplex_chat install
+
+    # PostgreSQL backend (Linux x86_64 only)
+    python -m simplex_chat install --backend postgres
+    ```
+
+    If you skip this step, `libsimplex` is downloaded lazily the first time `bot.run()` is called.
+  </Step>
+</Steps>
+
+## Quick start: echo bot
+
+<Steps>
+  <Step title="Create bot.py">
+    ```python bot.py
+    import re
+    from simplex_chat import Bot, BotProfile, SqliteDb, TextMessage
+
+    bot = Bot(
+        profile=BotProfile(display_name="Echo Bot"),
+        db=SqliteDb(file_prefix="./echo_bot"),
+        welcome="Send me any message and I'll echo it back.",
+    )
+
+    @bot.on_message(content_type="text")
+    async def handle_message(msg: TextMessage) -> None:
+        await msg.reply(msg.text or "")
+
+    if __name__ == "__main__":
+        bot.run()
+    ```
+  </Step>
+  <Step title="Run the bot">
+    ```sh
+    python bot.py
+    ```
+  </Step>
+  <Step title="Connect to your bot">
+    The bot prints its SimpleX contact address on startup:
+
+    ```
+    Bot address: simplex:/contact#...
+    ```
+
+    Paste this into any SimpleX Chat app to connect.
+  </Step>
+</Steps>
+
+## Handler types
+
+The SDK provides three decorator types. Handlers are matched in **first-match-wins** order within each type — register more specific handlers before generic catch-alls.
+
+| Decorator | Trigger | Callback signature |
+|---|---|---|
+| `@bot.on_message(content_type=..., text=...)` | Incoming message matching content type and/or text regex | `async def handler(msg: Message) -> None` |
+| `@bot.on_command(name)` | Slash-command (e.g. `/help`) | `async def handler(msg: Message) -> None` |
+| `@bot.on_event(tag)` | Any raw event by its `type` tag | `async def handler(event: dict) -> None` |
+
+<Note>
+Handlers are matched in registration order — place more specific handlers (e.g. exact command matches or numeric patterns) before generic catch-all handlers. The first matching handler wins; subsequent handlers for the same message are not called.
+</Note>
+
+## Content type filtering
+
+Use `content_type` and `text` filters together to match specific messages precisely:
+
+```python
+@bot.on_message(content_type="text", text=re.compile(r"^/ping$"))
+async def pong(msg: TextMessage) -> None:
+    await msg.reply("pong")
+
+@bot.on_message(content_type="text", text=re.compile(r"^-?\d+(\.\d+)?$"))
+async def square(msg: TextMessage) -> None:
+    n = float(msg.text or "0")
+    await msg.reply(f"{n} * {n} = {n * n}")
+
+@bot.on_message(content_type="text")
+async def fallback(msg: TextMessage) -> None:
+    await msg.reply("Send me a number, like 7 or 3.14.")
+```
+
+The `text` parameter accepts either a plain string (exact match) or a compiled `re.Pattern` (regex match against the message text).
+
+## Full squaring bot example
+
+The following is the complete squaring bot from the SDK examples:
+
+```python bot.py
+import re
+from simplex_chat import Bot, BotProfile, Message, SqliteDb, TextMessage
+
+bot = Bot(
+    profile=BotProfile(display_name="Squaring bot"),
+    db=SqliteDb(file_prefix="./squaring_bot"),
+    welcome="Send me a number, I'll square it.",
+)
+
+@bot.on_message(content_type="text", text=re.compile(r"^-?\d+(\.\d+)?$"))
+async def square(msg: TextMessage) -> None:
+    n = float(msg.text or "0")
+    await msg.reply(f"{n} * {n} = {n * n}")
+
+@bot.on_message(content_type="text")
+async def fallback(msg: Message) -> None:
+    await msg.reply("Send me a number, like 7 or 3.14.")
+
+if __name__ == "__main__":
+    bot.run()
+```
+
+## Database configuration
+
+Pass a `SqliteDb` or `PostgresDb` instance to `Bot(db=...)`:
+
+```python
+from simplex_chat import SqliteDb, PostgresDb
+
+# SQLite (default, all platforms)
+db = SqliteDb(file_prefix="./bot_data/bot")
+# optional: encryption_key="sqlcipher-passphrase"
+
+# PostgreSQL (Linux x86_64 only)
+db = PostgresDb(
+    connection_string="postgresql://user:pass@localhost/botdb",
+    # schema_prefix="bot_",  # optional, defaults to "simplex_v1"
+)
+```
+
+## Wire types
+
+All types exchanged over the WebSocket API are available in `simplex_chat.types`. They are auto-generated from the Haskell source, so they match exactly what the CLI sends and receives. This means field names and union discriminants in Python match those in the [API Types reference](/bots/api-types) exactly.
+
+```python
+from simplex_chat.types import ChatInfo, ChatItem, User
+```

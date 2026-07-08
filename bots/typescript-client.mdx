@@ -1,0 +1,299 @@
+---
+title: "SimpleX TypeScript WebSocket Client Reference"
+sidebarTitle: "TypeScript Client"
+description: "The @simplex-chat/client package provides a low-level TypeScript WebSocket client for the SimpleX CLI server with typed commands, responses, and events."
+---
+
+The TypeScript client (`packages/simplex-chat-client/typescript`) is a low-level WebSocket client that wraps the SimpleX CLI's JSON wire protocol with TypeScript types. It connects to a running SimpleX CLI server over WebSocket, serialises commands as `{corrId, cmd}` JSON frames, correlates responses by `corrId`, and pushes unsolicited events into an async bounded queue (`ABQueue<ChatEvent>`). All chat types — commands, responses, and events — come from the companion `@simplex-chat/types` package, which is auto-generated from the Haskell source.
+
+<Note>
+  The TypeScript client is the underlying transport layer. For new projects the higher-level Node.js SDK (`simplex-chat` npm package) is recommended — it handles process management, native library embedding, and provides a cleaner API.
+</Note>
+
+## Installation
+
+This package is included as part of `simplex-chat` (Node.js SDK), or can be used standalone for WebSocket server connections:
+
+```sh
+# Via npm (Node.js SDK, includes TypeScript client)
+npm install simplex-chat
+```
+
+To use the client directly without the Node.js SDK, reference the workspace package or install `@simplex-chat/client` from source.
+
+## ChatClient class
+
+`ChatClient` is the main class. Create an instance with the static async factory `ChatClient.create`, then interact with the chat via its typed methods and iterate `msgQ` to process inbound events.
+
+### Factory
+
+```typescript
+ChatClient.create(server?: ChatServer | string, config?: ChatClientConfig): Promise<ChatClient>
+```
+
+Connects to the CLI server and returns a ready `ChatClient`. The `server` argument can be:
+
+- A `ChatServer` object `{host: string, port?: string}` — connects as `ws://<host>:<port>` (default port `5225`)
+- A plain WebSocket URL string, e.g. `'ws://localhost:5225'`
+
+If omitted, defaults to `{host: 'localhost', port: '5225'}`.
+
+### Properties
+
+| Property | Type | Description |
+|---|---|---|
+| `msgQ` | `ABQueue<ChatEvent>` | Async bounded queue of inbound events. Iterate with `for await`. |
+| `connected` | `boolean` | Whether the WebSocket transport is still open. |
+
+### User management
+
+```typescript
+apiGetActiveUser(): Promise<T.User | undefined>
+```
+Returns the currently active user profile, or `undefined` if no user exists yet.
+
+```typescript
+apiCreateActiveUser(profile?: T.Profile): Promise<T.User>
+```
+Creates a new user profile. `profile` is optional; if omitted the server uses default values.
+
+```typescript
+apiUpdateProfile(userId: number, profile: T.Profile): Promise<T.Profile | undefined>
+```
+Updates the profile for `userId`. Returns the new `Profile` on change, or `undefined` if nothing changed.
+
+### Contact address management
+
+```typescript
+apiGetUserAddress(userId: number): Promise<string | undefined>
+```
+Returns the bot's contact address URL, or `undefined` if no address has been created.
+
+```typescript
+apiCreateUserAddress(userId: number): Promise<string>
+```
+Creates a long-term contact address and returns the address URL string (prefers the short link if available).
+
+```typescript
+apiDeleteUserAddress(userId: number): Promise<void>
+```
+Deletes the bot's contact address.
+
+```typescript
+enableAddressAutoAccept(userId: number, autoReply?: T.MsgContent, businessAddress?: boolean): Promise<void>
+```
+Enables automatic acceptance of incoming contact requests. An optional `autoReply` message content is sent to every new contact on connection. `businessAddress` (default `false`) marks this as a business chat address.
+
+```typescript
+disableAddressAutoAccept(userId: number, businessAddress?: boolean): Promise<void>
+```
+Disables automatic acceptance; contact requests must be accepted or rejected manually.
+
+### Messaging
+
+```typescript
+apiSendTextMessage(chatType: T.ChatType, chatId: number, text: string): Promise<T.AChatItem[]>
+```
+Sends a plain-text message to a direct contact or group. Returns the created `AChatItem` array.
+
+```typescript
+apiSendMessages(chatType: T.ChatType, chatId: number, messages: T.ComposedMessage[]): Promise<T.AChatItem[]>
+```
+Sends one or more composed messages (with optional file, quote, or mentions) in a single call.
+
+```typescript
+apiUpdateChatItem(chatType: T.ChatType, chatId: number, chatItemId: number, msgContent: T.MsgContent): Promise<T.ChatItem>
+```
+Edits an existing message. Returns the updated `ChatItem`.
+
+```typescript
+apiDeleteChatItems(chatType: T.ChatType, chatId: number, chatItemIds: number[], deleteMode: T.CIDeleteMode): Promise<T.ChatItemDeletion[] | undefined>
+```
+Deletes one or more messages. `deleteMode` controls visibility (e.g. `CIDeleteMode.Broadcast` notifies the peer, `CIDeleteMode.Internal` hides locally only).
+
+### Contact requests
+
+```typescript
+apiAcceptContactRequest(contactReqId: number): Promise<T.Contact>
+```
+Accepts a pending contact request by its ID. Returns the created `Contact`.
+
+```typescript
+apiRejectContactRequest(contactReqId: number): Promise<void>
+```
+Rejects a pending contact request. The requester is not notified.
+
+### Connection management
+
+```typescript
+apiCreateLink(userId: number): Promise<string>
+```
+Creates a one-time invitation link for `userId`. Returns the link URL string.
+
+```typescript
+apiConnectActiveUser(connLink: string): Promise<ConnReqType>
+```
+Connects the active user via a SimpleX link string. Returns `ConnReqType.Invitation` or `ConnReqType.Contact` depending on the link type.
+
+```typescript
+apiDeleteChat(chatType: T.ChatType, chatId: number, deleteMode?: T.ChatDeleteMode): Promise<void>
+```
+Deletes a direct or group chat.
+
+### Group management
+
+```typescript
+apiNewGroup(userId: number, groupProfile: T.GroupProfile): Promise<T.GroupInfo>
+apiAddMember(groupId: number, contactId: number, memberRole: T.GroupMemberRole): Promise<T.GroupMember>
+apiJoinGroup(groupId: number): Promise<T.GroupInfo>
+apiRemoveMembers(groupId: number, memberIds: number[], withMessages?: boolean): Promise<T.GroupMember[]>
+apiLeaveGroup(groupId: number): Promise<T.GroupInfo>
+apiListMembers(groupId: number): Promise<T.GroupMember[]>
+apiUpdateGroup(groupId: number, groupProfile: T.GroupProfile): Promise<T.GroupInfo>
+```
+
+### Files
+
+```typescript
+apiReceiveFile(fileId: number): Promise<T.AChatItem>
+```
+Approves and begins receiving a file transfer.
+
+### Raw commands
+
+```typescript
+sendChatCmd(cmd: string): Promise<ChatResponse>
+```
+Sends a raw command string over the wire and returns the correlated response. Useful for commands not yet covered by a typed method.
+
+### Teardown
+
+```typescript
+disconnect(): Promise<void>
+```
+Closes the WebSocket transport and waits for the internal event-processing loop to finish.
+
+---
+
+## ChatClientConfig
+
+```typescript
+interface ChatClientConfig {
+  readonly qSize: number     // message queue buffer size (default: 16)
+  readonly tcpTimeout: number  // connection timeout ms (default: 4000)
+}
+```
+
+Pass a config object as the second argument to `ChatClient.create` to override defaults:
+
+```typescript
+const chat = await ChatClient.create('ws://localhost:5225', {
+  qSize: 64,
+  tcpTimeout: 10_000,
+})
+```
+
+`qSize` controls the maximum number of unprocessed events that can be buffered in `msgQ` before back-pressure is applied to the inbound WebSocket frames.
+
+---
+
+## ChatServer interface
+
+```typescript
+interface ChatServer {
+  readonly host: string
+  readonly port?: string  // defaults to "5225"
+}
+```
+
+`localServer` (`{host: 'localhost', port: '5225'}`) is the default when no server is provided.
+
+---
+
+## Event loop pattern
+
+The standard bot pattern is to iterate `chat.msgQ` with `for await`. The queue yields `ChatEvent` values; each event has a `type` discriminator that narrows the union:
+
+```typescript squaring-bot.ts
+import {ChatClient} from '@simplex-chat/client'
+import {ChatType} from '@simplex-chat/types'
+
+const chat = await ChatClient.create('ws://localhost:5225')
+
+// Get or create a user profile
+const user = await chat.apiGetActiveUser()
+if (!user) {
+  console.log('No active user — create one first via the CLI')
+  process.exit(1)
+}
+
+// Get or create a long-term contact address
+const address =
+  (await chat.apiGetUserAddress(user.userId)) ??
+  (await chat.apiCreateUserAddress(user.userId))
+
+// Auto-accept incoming contact requests with a welcome message
+await chat.enableAddressAutoAccept(user.userId, {type: 'text', text: 'Hello!'})
+
+console.log('Bot address:', address)
+
+// Process inbound events
+for await (const event of chat.msgQ) {
+  if (event.type === 'contactConnected') {
+    const {contact} = event
+    await chat.apiSendTextMessage(
+      ChatType.Direct,
+      contact.contactId,
+      'Hello! Send me a number and I will square it.'
+    )
+  } else if (event.type === 'newChatItems') {
+    for (const {chatInfo, chatItem} of event.chatItems) {
+      if (chatInfo.type !== 'direct') continue
+      const content = chatItem.content
+      if (content.type !== 'rcvMsgContent') continue
+      const text = content.msgContent.text
+      if (text !== undefined) {
+        const n = Number(text)
+        if (!isNaN(n)) {
+          await chat.apiSendTextMessage(
+            ChatType.Direct,
+            chatInfo.contact.contactId,
+            String(n * n)
+          )
+        }
+      }
+    }
+  }
+}
+```
+
+The `for await` loop exits when the WebSocket closes (the queue is sealed). Call `chat.disconnect()` to close gracefully.
+
+---
+
+## Types package
+
+Import all wire types from `@simplex-chat/types`. The package re-exports four namespaces:
+
+| Export | Description |
+|---|---|
+| `CC` | Chat command interfaces with `cmdString()` serialisers (e.g. `CC.APISendMessages`, `CC.APICreateMyAddress`) |
+| `CR` / `ChatResponse` | Response type interfaces, one per `CR.Tag` discriminator (e.g. `CR.ActiveUser`, `CR.NewChatItems`) |
+| `CEvt` / `ChatEvent` | Event type interfaces, one per `CEvt.Tag` discriminator (e.g. `CEvt.ContactConnected`, `CEvt.NewChatItems`) |
+| `T` | All core data types: `T.User`, `T.Contact`, `T.GroupInfo`, `T.ChatItem`, `T.MsgContent`, `T.ChatType`, etc. |
+
+```typescript
+import {CC, CR, CEvt, T} from '@simplex-chat/types'
+
+// Narrow an event
+function handle(event: CEvt.ChatEvent) {
+  if (event.type === 'newChatItems') {
+    // event is now CEvt.NewChatItems
+    for (const item of event.chatItems) {
+      const content: T.CIContent = item.chatItem.content
+    }
+  }
+}
+```
+
+`ChatResponse` and `ChatEvent` are discriminated unions over their respective `Tag` string literals, so a `switch (r.type)` statement or an `if` guard narrows the type automatically in TypeScript.

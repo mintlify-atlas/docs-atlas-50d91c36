@@ -1,0 +1,169 @@
+---
+title: "Install and Run the SimpleX Chat Terminal CLI"
+sidebarTitle: "CLI Install"
+description: "Install the SimpleX terminal client on Linux, macOS, or Windows via install script, package manager, or build from source with GHC and Cabal."
+---
+
+The SimpleX terminal CLI is a fully-featured SimpleX participant — it uses the same double-ratchet end-to-end encryption, the same SMP relay protocol, and the same privacy guarantees as the mobile apps. You can use it for interactive chat in a terminal, automate workflows with single-command mode, or run it as a WebSocket server to power bots and integrations.
+
+## Quick install
+
+<Tabs>
+  <Tab title="Linux and macOS">
+    Run the official install script to download and install the latest stable binary in one step:
+
+    ```bash
+    curl -o- https://raw.githubusercontent.com/simplex-chat/simplex-chat/stable/install.sh | bash
+    ```
+
+    If you prefer `wget`:
+
+    ```bash
+    wget -qO- https://raw.githubusercontent.com/simplex-chat/simplex-chat/stable/install.sh | bash
+    ```
+
+    Once the script finishes, start the chat:
+
+    ```bash
+    simplex-chat
+    ```
+
+    Alternatively, download the binary manually from the [latest stable release](https://github.com/simplex-chat/simplex-chat/releases), make it executable, and move it onto your `PATH`:
+
+    ```bash
+    chmod +x <binary>
+    mv <binary> ~/.local/bin/simplex-chat
+    ```
+
+    <Note>
+      On macOS you may need to [allow Gatekeeper to run the binary](https://support.apple.com/en-us/HT202491) before it will launch.
+    </Note>
+  </Tab>
+  <Tab title="Windows">
+    Download the pre-built Windows binary (`simplex-chat-windows-x86-64`) from the [GitHub releases page](https://github.com/simplex-chat/simplex-chat/releases/latest), then move it to a directory on your `PATH`:
+
+    ```powershell
+    move <binary> %APPDATA%\local\bin\simplex-chat.exe
+    ```
+
+    Open a new Command Prompt or PowerShell window and run:
+
+    ```powershell
+    simplex-chat
+    ```
+  </Tab>
+</Tabs>
+
+## Build from source
+
+> Use source code from the [`stable` branch](https://github.com/simplex-chat/simplex-chat/tree/stable) for all production builds.
+
+<Tabs>
+  <Tab title="Docker (Linux)">
+    Build the executable using [Docker's custom build outputs](https://docs.docker.com/engine/reference/commandline/build/#custom-build-outputs) — no Haskell toolchain required on the host:
+
+    ```shell
+    git clone git@github.com:simplex-chat/simplex-chat.git
+    cd simplex-chat && git checkout stable
+    DOCKER_BUILDKIT=1 docker build --output ~/.local/bin .
+    ```
+
+    The compiled `simplex-chat` binary will be placed in `~/.local/bin`.
+
+    <Note>
+      If you encounter a `` version `GLIBC_2.28' not found `` error, edit the local `Dockerfile` to use the `haskell:8.10.7-stretch` base image and rebuild.
+    </Note>
+  </Tab>
+  <Tab title="Haskell / Cabal (any OS)">
+    **1. Install the Haskell toolchain**
+
+    Install [GHCup](https://www.haskell.org/ghcup/), then use it to install GHC 9.6.3 and Cabal 3.10.1.0:
+
+    ```shell
+    curl --proto '=https' --tlsv1.2 -sSf https://get-ghcup.haskell.org | sh
+    ```
+
+    Verify or add the required versions interactively:
+
+    ```shell
+    ghcup tui
+    ```
+
+    **2. Clone the repository**
+
+    ```shell
+    git clone git@github.com:simplex-chat/simplex-chat.git
+    cd simplex-chat && git checkout stable
+    ```
+
+    **3. Install system dependencies**
+
+    On Linux (Debian/Ubuntu):
+
+    ```shell
+    apt-get update && apt-get install -y build-essential libgmp3-dev zlib1g-dev
+    cp scripts/cabal.project.local.linux cabal.project.local
+    ```
+
+    On macOS:
+
+    ```shell
+    brew install openssl@3.0
+    cp scripts/cabal.project.local.mac cabal.project.local
+    ```
+
+    You may need to edit `cabal.project.local` to point to the actual OpenSSL installation path reported by `brew`.
+
+    **4. Build and install**
+
+    ```shell
+    cabal update && cabal install simplex-chat
+    ```
+  </Tab>
+</Tabs>
+
+## CLI usage modes
+
+The `simplex-chat` binary can run in three distinct modes depending on your use case:
+
+1. **Interactive terminal REPL (default)** — Start without any flags to open the full interactive chat interface. Type `/help` inside the REPL to see all available commands.
+
+2. **Single-command mode (`--command`)** — Pass a single chat command and the process exits after executing it. Useful for scripting or cron jobs.
+
+3. **WebSocket server mode (`-p PORT`)** — The CLI starts a WebSocket JSON API server instead of an interactive prompt. Bots and external tools connect to this port to send and receive messages programmatically.
+
+## Key CLI options
+
+| Flag | Description |
+|---|---|
+| `-p PORT` | Start as a WebSocket bot server listening on `PORT` |
+| `--command CMD` | Execute a single chat command and exit immediately |
+| `--store-log` | Enable logging of SMP server connection events to a file |
+| `-d PATH` / `--db-file-prefix PATH` | Set a custom path prefix for the SQLite database files |
+| `-s SERVER` | Use a custom SMP relay server (overrides built-in defaults) |
+| `-x` | Route all server connections through Tor (SOCKS5 on port 9050) |
+
+Run `simplex-chat -h` to see the full list of options.
+
+<Tip>
+  The database is stored at `~/.simplex/` by default (or `%APPDATA%/simplex` on Windows). Back it up regularly — it contains all your messages and contacts. The two SQLite files are `simplex_v1_chat.db` and `simplex_v1_agent.db`.
+</Tip>
+
+## Common commands inside the REPL
+
+Once the CLI is running and you have set your display name, use these commands to interact:
+
+| Command | Description |
+|---|---|
+| `/help` | List all available commands |
+| `/connect` or `/c` | Generate a new one-time invitation link |
+| `/connect <link>` or `/c <link>` | Accept an invitation or connect via a SimpleX address |
+| `/address` or `/ad` | Create or display your long-term contact address |
+| `/groups` | List all groups you are a member of |
+| `/create group <name>` or `/g <name>` | Create a new group |
+| `/members <group>` | List members of a group |
+| `/file <contact> <path>` or `/f @<contact> <path>` | Send a file to a contact |
+| `@<name> <message>` | Send a message to a specific contact by name |
+| `#<group> <message>` | Send a message to a group |
+
+> **Groups are not stored on any server.** The app maintains a local list of group members in its database and sends each message to each member individually.

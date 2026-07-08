@@ -1,0 +1,154 @@
+---
+title: "Install and Initialize Your Own SMP Server"
+sidebarTitle: "SMP Install"
+description: "Deploy an SMP relay server using the installation script or Docker. Initialize with your domain, open required ports, and add it to your SimpleX apps."
+---
+
+The SMP server binary is available through three deployment paths: the official **installation script** (recommended for Ubuntu), a **Docker Compose** setup, or the **Linode Marketplace** for one-click VM provisioning. All three result in a fully functional relay you can add to your SimpleX apps.
+
+## Quick start with systemd (recommended)
+
+<Steps>
+  <Step title="Run the installation script">
+    The [official installation script](https://github.com/simplex-chat/simplexmq#using-installation-script) installs the binary, creates a dedicated `smp` system user, and sets up systemd services, automatic backup, and update tooling. Currently supports Ubuntu only.
+
+    ```sh
+    curl --proto '=https' --tlsv1.2 -sSf \
+      https://raw.githubusercontent.com/simplex-chat/simplexmq/stable/install.sh \
+      -o simplex-server-install.sh && \
+    if echo '53fcdb4ceab324316e2c4cda7e84dbbb344f32550a65975a7895425e5a1be757 simplex-server-install.sh' | sha256sum -c; then
+      chmod +x ./simplex-server-install.sh
+      ./simplex-server-install.sh
+      rm ./simplex-server-install.sh
+    else
+      echo "SHA-256 checksum is incorrect!"
+      rm ./simplex-server-install.sh
+    fi
+    ```
+
+    When prompted, type `1` and press Enter to install `smp-server`.
+  </Step>
+
+  <Step title="Open firewall ports">
+    Allow the ports SMP server listens on. Port 80 is required so Caddy can obtain a Let's Encrypt TLS certificate for the server information page.
+
+    ```sh
+    ufw allow 80/tcp
+    ufw allow 443/tcp
+    ufw allow 5223/tcp
+    ```
+  </Step>
+
+  <Step title="Initialize the server">
+    Replace `smp1.example.com` with your actual domain. This command runs non-interactively and enables store log, removes the queue-creation password requirement, enables the control port, enables the SOCKS proxy for forwarding to Tor-only servers, and embeds a link to the source code (required by the AGPLv3 license).
+
+    ```sh
+    su smp -c 'smp-server init --yes --store-log --no-password --control-port \
+                                --socks-proxy --source-code --fqdn=smp1.example.com'
+    ```
+
+    After initialization completes, the terminal will print output similar to:
+
+    ```
+    Certificate request self-signature ok
+    subject=CN = smp1.example.com
+    Server initialized, you can modify configuration in /etc/opt/simplex/smp-server.ini.
+    Run `smp-server start` to start server.
+    ----------
+    SMP server v3.4.0
+    Fingerprint: d5fcsc7hhtPpexYUbI2XPxDbyU2d3WsVmROimcL90ss=
+    Server address: smp://d5fcsc7hhtPpexYUbI2XPxDbyU2d3WsVmROimcL90ss=@smp1.example.com
+    ```
+
+    Save the full server address — you will need it when configuring the app.
+  </Step>
+
+  <Step title="Start the service">
+    Enable the systemd service so the server starts automatically on boot, then start it immediately:
+
+    ```sh
+    systemctl enable --now smp-server
+    ```
+  </Step>
+
+  <Step title="Confirm the server address">
+    The server address is printed in the journal on every start. You can retrieve it with:
+
+    ```sh
+    journalctl --output cat -q \
+      _SYSTEMD_INVOCATION_ID="$(systemctl show -p InvocationID --value smp-server)" \
+      | grep -m1 'Server address:'
+    ```
+
+    You can also find it at any time by reading:
+
+    ```sh
+    cat /etc/opt/simplex/fingerprint
+    ```
+  </Step>
+</Steps>
+
+<Note>
+  The `--store-log` flag enables persistent storage of connection and subscription state across restarts. Without it, in-flight messages may be lost on restart. The store log is compacted on every start — deleted queues are pruned from it automatically.
+</Note>
+
+## Docker deployment
+
+Docker Compose is the second recommended deployment path. The **automatic** setup pairs the SMP server with [Caddy](https://caddyserver.com) for automatic Let's Encrypt certificate management. The **manual** setup gives you full control over ports 80 and 443 and is better suited when another web server is already running on the host.
+
+The example below shows a minimal manual run (useful for testing). For production, use the [automatic Docker Compose configuration](https://raw.githubusercontent.com/simplex-chat/simplexmq/refs/heads/stable/scripts/docker/docker-compose-smp-complete.yml):
+
+```sh
+docker pull simplexchat/smp-server:latest
+
+docker run -d --name smp-server \
+  -p 5223:5223 \
+  -p 443:443 \
+  -v /etc/opt/simplex:/etc/opt/simplex \
+  -v /var/opt/simplex:/var/opt/simplex \
+  -e ADDR=smp.example.com \
+  simplexchat/smp-server:latest
+```
+
+State and configuration files are persisted in the two bind-mounted host directories (`/etc/opt/simplex` and `/var/opt/simplex`), so the container can be replaced or upgraded without losing queues or messages.
+
+## Configuring the app to use your server
+
+Once your server is running, add it to the SimpleX mobile or desktop app:
+
+1. Open **Settings** → **Network & servers** → **SMP servers**
+2. Tap the **`+`** button to add a new server
+3. Paste your full server address and tap **Save**
+
+You can use your server alongside the pre-configured SimpleX servers or disable the defaults entirely.
+
+### Server address format
+
+```
+smp://<fingerprint>@smp.example.com
+```
+
+If you have also configured a Tor hidden service, include both hostnames separated by a comma:
+
+```
+smp://<fingerprint>@smp.example.com,youraddress.onion
+```
+
+To password-protect queue creation (so only people you share the address with can receive messages via your server), include the password after the fingerprint:
+
+```
+smp://<fingerprint>:<password>@smp.example.com
+```
+
+You can share your server address with contacts by showing them the QR code in the server settings screen — the QR code includes the password automatically.
+
+## Verifying the installation
+
+The SMP server embeds a lightweight web server that serves a **server information page** on port 443 (via TLS). Once Caddy has obtained a certificate and the server has started, open `https://smp.example.com` in a browser. You should see the server status, version, fingerprint, and any operator information you configured in the `[INFORMATION]` section of `smp-server.ini`.
+
+If the page is not reachable yet, check service status and logs:
+
+```sh
+systemctl status smp-server
+journalctl -u smp-server -f
+```

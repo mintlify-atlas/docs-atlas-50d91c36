@@ -1,0 +1,136 @@
+---
+title: "Install and Configure Your Own XFTP Server"
+sidebarTitle: "XFTP Install"
+description: "Deploy an XFTP file server with the install script or Docker on Ubuntu. Initialize with your domain, set storage quotas, and register it in the SimpleX apps."
+---
+
+`xftp-server` is available via the same installation script as `smp-server`, or via Docker Compose. The installation script is the recommended path for most operators — it configures binaries, systemd services, and management scripts automatically on Ubuntu. Docker Compose is a good alternative if you prefer container-based deployments.
+
+## Installation via script
+
+<Steps>
+  <Step title="Download and run the install script">
+    Run the following commands on your server. The script verifies its own SHA-256 checksum before executing:
+
+    ```sh
+    curl --proto '=https' --tlsv1.2 -sSf \
+      https://raw.githubusercontent.com/simplex-chat/simplexmq/stable/install.sh \
+      -o simplex-server-install.sh
+    chmod +x ./simplex-server-install.sh && ./simplex-server-install.sh
+    ```
+
+    When prompted to select a server type, type `2` and press Enter to install `xftp-server`.
+  </Step>
+  <Step title="Create required directories and a dedicated user">
+    Create the configuration, state, and file storage directories, then create a dedicated `xftp` system user and assign ownership:
+
+    ```sh
+    sudo mkdir -p /var/opt/simplex-xftp /etc/opt/simplex-xftp /srv/xftp
+    sudo useradd -m xftp
+    sudo chown xftp:xftp /var/opt/simplex-xftp /etc/opt/simplex-xftp /srv/xftp
+    ```
+
+    - `/etc/opt/simplex-xftp` — configuration files and TLS certificates
+    - `/var/opt/simplex-xftp` — store log, statistics, and server state
+    - `/srv/xftp` — uploaded file chunk storage
+  </Step>
+  <Step title="Initialize the server">
+    Run `xftp-server init` as the `xftp` user to generate TLS credentials and write the initial configuration. Replace `xftp.example.com` with your actual domain:
+
+    ```sh
+    su xftp -c 'xftp-server init --store-log --quota=10gb --fqdn=xftp.example.com'
+    ```
+
+    On success you will see output similar to:
+
+    ```
+    SimpleX XFTP server v0.1.0
+    Fingerprint: ioyYeRyy4SqJkNvb_7nM04MuLasOM4c-acVyVnqw248=
+    Server address: xftp://ioyYeRyy4SqJkNvb_7nM04MuLasOM4c-acVyVnqw248=@xftp.example.com
+    ```
+
+    Save the printed server address — you will need it to configure clients.
+  </Step>
+  <Step title="Enable and start xftp-server">
+    Enable the systemd service so the server starts on boot, then start it immediately:
+
+    ```sh
+    systemctl enable --now xftp-server
+    ```
+  </Step>
+</Steps>
+
+<Tip>
+  Set `--quota` to a value your disk can comfortably sustain. XFTP servers can accumulate gigabytes of temporary file chunks quickly on active servers — leave at least 20% of your disk free as headroom.
+</Tip>
+
+## Docker deployment
+
+For a container-based deployment, create a working directory and use Docker Compose with an `.env` file:
+
+```sh
+docker pull simplexchat/xftp-server
+docker run -d --name xftp-server \
+  -p 443:443 \
+  -v /etc/opt/simplex-xftp:/etc/opt/simplex-xftp \
+  -v /var/opt/simplex-xftp:/var/opt/simplex-xftp \
+  -v /srv/xftp:/srv/xftp \
+  simplexchat/xftp-server
+```
+
+The container reads `ADDR` and `QUOTA` from environment variables. For a full Docker Compose example (including `.env` configuration), refer to the [official docker-compose-xftp.yml](https://raw.githubusercontent.com/simplex-chat/simplexmq/refs/heads/stable/scripts/docker/docker-compose-xftp.yml) in the simplexmq repository.
+
+## Key init flags
+
+| Flag | Description |
+|---|---|
+| `--fqdn=HOST` | Domain name used as the Common Name for the auto-generated TLS certificate |
+| `--quota=SIZE` | Maximum total storage for file chunks (e.g. `10gb`, `500mb`) |
+| `--store-log` | Persist the file chunk registry to disk so it survives server restarts |
+| `--ip IP` | Server IP address, used as Common Name if `--fqdn` is not supplied |
+| `--path PATH` | Directory in which file chunks are stored (default: `/srv/xftp`) |
+
+## Adding your XFTP server to the app
+
+To use your server in the SimpleX mobile or desktop app:
+
+1. Open **Settings** → **Network & servers** → **XFTP servers**
+2. Tap the **`+`** button to add a new server
+3. Paste your server address in the format:
+
+   ```
+   xftp://fingerprint@xftp.example.com
+   ```
+
+   If you set a creation password, include it:
+
+   ```
+   xftp://fingerprint:password@xftp.example.com
+   ```
+
+The fingerprint is printed during `xftp-server init` and is also stored in `/etc/opt/simplex-xftp/fingerprint`.
+
+## Systemd management
+
+Check the current status of your server:
+
+```sh
+systemctl status xftp-server
+```
+
+Stream live logs:
+
+```sh
+journalctl -u xftp-server -f
+```
+
+Stop and start the server:
+
+```sh
+systemctl stop xftp-server
+systemctl start xftp-server
+```
+
+<Note>
+  Use `SIGINT` (i.e., `systemctl stop`) rather than `SIGKILL` to stop the server. A clean shutdown ensures the store log is saved correctly and undelivered chunk state is not lost.
+</Note>

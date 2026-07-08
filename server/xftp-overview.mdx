@@ -1,0 +1,62 @@
+---
+title: "XFTP Server: Metadata-Private File Transfer for SimpleX"
+sidebarTitle: "XFTP Overview"
+description: "XFTP is SimpleX's file transfer protocol — files are split into fixed-size encrypted chunks sent through separate servers so no server sees the full file or identifies users."
+---
+
+XFTP (eXtended File Transfer Protocol) is built on the same privacy principles as SMP (SimpleX Messaging Protocol) but designed specifically for file transfer. Where SMP relays real-time messages between users, XFTP handles the asynchronous, encrypted delivery of files — ensuring no single server ever sees the complete file, knows who is sending it, or can link sender traffic to recipient traffic.
+
+## XFTP design principles
+
+<Steps>
+  <Step title="Files split into fixed-size chunks">
+    Every file is divided into fixed-size encrypted chunks before leaving the sender's device. Fixed chunk sizes prevent servers from inferring file sizes or types based on transfer patterns.
+  </Step>
+  <Step title="Chunks routed through separate XFTP servers">
+    Each chunk can be uploaded to a different XFTP relay. No single server ever holds the complete file, so a compromised or logging server cannot reconstruct what was transferred.
+  </Step>
+  <Step title="End-to-end encryption with NaCl">
+    Every chunk is individually end-to-end encrypted using NaCl (libsodium) primitives. The XFTP relay stores only ciphertext and has no access to the plaintext content or the encryption keys.
+  </Step>
+  <Step title="Upload once, download by multiple recipients">
+    The sender uploads each chunk exactly once. Multiple recipients can independently download the same chunks without requiring the sender to be online or re-upload anything.
+  </Step>
+  <Step title="No common identifiers between sender and recipient traffic">
+    There are no shared identifiers or ciphertext in common between the traffic sent to upload a chunk and the traffic received when downloading it — the same privacy guarantee as SMP message relays.
+  </Step>
+  <Step title="Files stored for a maximum of 48 hours">
+    Chunks are stored on XFTP relays for a limited time — currently a maximum of 48 hours — or until the sender explicitly deletes them. This limits the window during which stored data can be targeted.
+  </Step>
+  <Step title="Sender IP is hidden from recipients">
+    Recipients download chunks directly from XFTP servers; they never communicate with the sender's device directly. The sender's IP address is therefore never exposed to recipients.
+  </Step>
+</Steps>
+
+## Comparison with SMP
+
+<CardGroup cols={2}>
+  <Card title="SMP — Message Relay" icon="message">
+    Designed for **real-time message delivery**. Messages are stored on the relay only until the recipient's client fetches them, after which they are immediately deleted. SMP is optimised for low latency and ephemeral communication.
+  </Card>
+  <Card title="XFTP — File Storage Relay" icon="file">
+    Designed for **asynchronous file transfer**. Encrypted file chunks are stored on the relay until retrieved by all intended recipients (or until the 48-hour expiry). XFTP is optimised for reliable, metadata-private delivery of larger payloads.
+  </Card>
+</CardGroup>
+
+## Why self-host XFTP?
+
+Running your own XFTP server gives you full control over the file transfer layer of your SimpleX deployment:
+
+- **Control file retention** — set the storage window to match your operational security requirements rather than relying on the default 48-hour limit.
+- **Set your own storage quotas** — allocate disk space according to your users' needs and prevent runaway storage consumption on shared infrastructure.
+- **Keep files off simplex.chat infrastructure** — ensure that file chunks never transit through servers operated by SimpleX Chat Ltd., which is important for high-trust or regulated environments.
+- **Content moderation** — use the server's control port to delete specific file chunks if required for compliance or moderation purposes.
+
+## Requirements
+
+To run an XFTP server you will need:
+
+- A **VPS or dedicated server** with adequate disk space — active servers can accumulate gigabytes of temporary chunks quickly.
+- A **domain name** (e.g. `xftp.example.com`) pointed at the server's IP address, used as the Common Name for the auto-generated TLS certificate.
+- **Port 443 open** in your firewall — XFTP servers listen on port 443 by default.
+- A Linux distribution with `systemd` support (Ubuntu 20.04 LTS or later is recommended and officially tested).

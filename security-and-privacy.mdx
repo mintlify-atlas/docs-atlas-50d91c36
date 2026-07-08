@@ -1,0 +1,99 @@
+---
+title: "SimpleX Security Model and Privacy Architecture"
+sidebarTitle: "Security & Privacy"
+description: "SimpleX uses double ratchet E2E encryption, TLS 1.3, NaCl crypto_box, and Ed448 signatures. Audited by Trail of Bits twice — in 2022 and 2024."
+---
+
+SimpleX Chat uses a layered security model in which multiple independent encryption mechanisms protect messages at every stage of their journey — from your device, through relay servers, to your contact's device. No single layer failure can expose your message content or reveal who you are communicating with. The architecture is designed so that even the relay servers that carry your messages cannot observe the plaintext, cannot link your sent traffic to your received traffic, and cannot identify you or your contacts. This model has been independently audited twice by Trail of Bits, a leading security research firm.
+
+## Encryption layers
+
+<Steps>
+  <Step title="TLS 1.3 transport encryption (client ↔ server)">
+    All connections between SimpleX clients and SMP relay servers are protected by TLS 1.2 or TLS 1.3. The allowed cipher suites are limited to `CHACHA20POLY1305_SHA256`, with key exchange restricted to `Ed25519`/`Ed448` and `Curve25519`/`Curve448`. This provides a secure, authenticated transport channel between your app and the server.
+  </Step>
+  <Step title="Additional server-to-recipient encryption layer">
+    A separate encryption layer using NaCl `crypto_box` is applied to messages as they are delivered from the server to the recipient. This layer ensures there is no ciphertext in common between the server's sent and received traffic — even if TLS is compromised, an observer cannot correlate incoming and outgoing server traffic to determine who is communicating with whom.
+  </Step>
+  <Step title="Double ratchet E2E encryption between contacts">
+    Every conversation between two users (or group members) uses the double ratchet algorithm — the same algorithm used by Signal. This provides **forward secrecy** (each message is encrypted with its own ephemeral key, so past messages remain secure if a key is later compromised) and **break-in recovery** (keys are frequently renegotiated as part of the message exchange, so future messages are protected even after a temporary compromise). Two pairs of `Curve448` keys are used for the initial key agreement.
+  </Step>
+  <Step title="Post-quantum resistant key exchange in double ratchet">
+    Since v5.6, the double ratchet protocol performs post-quantum resistant key exchange on *every ratchet step*. This protects against future attacks by quantum computers that could retroactively decrypt messages captured today — a threat sometimes called "harvest now, decrypt later."
+  </Step>
+  <Step title="NaCl crypto_box per message queue">
+    Each unidirectional message queue has an additional NaCl `crypto_box` encryption layer. This layer is independent of the double ratchet and is applied per-queue, using `Curve25519` keys. It provides redundancy for future queue-level confidentiality and ensures that the same plaintext message produces different ciphertexts in different queues — preventing correlation even if a server's TLS is compromised.
+  </Step>
+  <Step title="Ed448 signatures authenticate every command and message">
+    Every client command sent to a server is signed with a per-queue ephemeral key. To protect against replay attacks, SimpleX servers require a `tlsunique` channel binding as the session ID in each signed command. Additionally, message integrity is protected via digests that chain each message to the previous one, so any tampering with the message sequence is detectable.
+  </Step>
+</Steps>
+
+All message metadata — including the time a message was received by the server (rounded to the nearest second) — is sent to recipients inside an encrypted envelope. Even if TLS is compromised, this metadata cannot be observed by a passive network attacker.
+
+Content padding is applied at several levels to frustrate message-size analysis attacks, preventing an observer from inferring message content or type from packet sizes.
+
+From v6.0, all SimpleX Chat clients also use **private message routing** by default. Instead of connecting directly to a contact's server, your client instructs a known forwarding server to relay the message. The message is additionally end-to-end encrypted between your client and the destination server, so the forwarding server cannot observe the destination or the server's response. This is effectively two-hop onion packet routing, providing per-message IP address protection — stronger than the per-connection protection offered by Tor or VPN.
+
+## Security audits
+
+SimpleX has been independently audited by [Trail of Bits](https://www.trailofbits.com/about), one of the most respected security research firms in the industry, on two separate occasions:
+
+**November 2022 — Implementation Security Assessment**
+
+Trail of Bits conducted a full implementation security assessment of SimpleX cryptography and networking. This assessment examined the actual code used in SimpleX clients and servers — the cryptographic primitives, their usage, key management, and the networking stack. The findings and remediation were published in the [v4.2 release announcement](https://simplex.chat/blog/20221108-simplex-chat-v4.2-security-audit-new-website.html). The full PDF report is publicly available.
+
+**July 2024 — Cryptographic Protocol Design Review**
+
+Trail of Bits conducted a second engagement focused specifically on the cryptographic *design* of SimpleX protocols — independent of any implementation. This review examined the protocol specifications, the double ratchet construction, the SMP relay design, and the post-quantum key exchange mechanism. The findings were published in the [v6.1 release announcement](https://simplex.chat/blog/20241014-simplex-network-v6-1-security-review-better-calls-user-experience.html). The full PDF report is publicly available.
+
+## Reporting vulnerabilities
+
+<Warning>
+Do **NOT** report security vulnerabilities via GitHub Issues or any public channel. Doing so could expose users to harm before a fix is available. Instead, email **chat@simplex.chat** directly.
+</Warning>
+
+To report a security issue:
+
+1. Email [chat@simplex.chat](mailto:chat@simplex.chat) with a description of the issue.
+2. Encrypt your message using the PGP key for that address, available from [keys.openpgp.org](https://keys.openpgp.org/search?q=chat%40simplex.chat). The key fingerprint is `FB44 AF81 A45B DE32 7319 797C 8510 7E35 7D4A 17FC`. Make your own key available so the team can reply securely.
+3. If PGP encryption is a barrier, an unencrypted submission is still better than no report.
+
+**Severity classification**
+
+| Severity | Description |
+|---|---|
+| **CRITICAL** | Significant disclosure of encrypted messages or files via relays or communication channels; vulnerabilities easily exploitable remotely to compromise private keys. Triggers immediate release of all supported versions. |
+| **HIGH** | Lower risk than critical — may affect less common configurations or require higher difficulty to exploit. Triggers a new release of all supported versions. |
+| **MEDIUM** | Crashes caused by received messages or files, protocol flaws in less-used features, or local flaws. Kept private until the next scheduled release. |
+| **LOW** | Issues affecting only the CLI app, unlikely configurations, or medium-severity issues that are very difficult to exploit. Fixed in the latest development version; may or may not be back-ported. |
+
+**Disclosure timeline**
+
+After a fix is developed and released:
+
+- **Day 0** — Trusted partners are privately notified of the severity level (not the details) on the day the fix is publicly released.
+- **Day 7** — A public announcement states that the release contains a security fix and its severity level, but no further details.
+- **Day 21** — Full details of the vulnerability, its impact, and the nature of the fix are published in the release notes. Whether detailed exploitation instructions are included is decided on a case-by-case basis.
+
+## Threat model
+
+SimpleX's security model is designed to protect against a wide range of adversaries — including the relay servers themselves, passive network observers, and active attackers who can intercept or tamper with TLS traffic.
+
+Certain threats are **explicitly out of scope** of the SimpleX security model:
+
+- **CPU and hardware flaws** — attacks exploiting hardware-level vulnerabilities (such as Spectre or Meltdown) are not considered SimpleX vulnerabilities.
+- **Physical side-channel attacks** — attacks based on physical observation such as power consumption analysis or electromagnetic emissions are outside the threat model.
+- **Root or user-privilege access to the device** — any user data stored on the device can be accessed by someone with user or root privileges. This includes files in app storage, the encrypted database, and the database encryption key if it is stored on the device.
+
+Mitigations for issues outside this scope may still be implemented, but they are weighed against competing priorities and are not classified as SimpleX vulnerabilities.
+
+For the full threat model documentation, see the [SimpleX whitepaper](https://github.com/simplex-chat/simplexmq/blob/stable/protocol/overview-tjr.md#threat-model).
+
+## Privacy features in the app
+
+- **Incognito mode** — when enabled, a new random profile name is generated for each new contact or group connection. Your real profile name and image are never shared with contacts you connect to in incognito mode.
+- **Database passphrase** — the local chat database (contacts, groups, messages) is encrypted with a passphrase. If you set a passphrase, it is not stored on the device, so the database cannot be accessed without it.
+- **Transport isolation** — different TCP connections and Tor circuits are used for different user profiles. Optionally, separate connections can be used for each individual contact or group member, preventing any single connection from being linked to multiple conversations.
+- **Tor via Orbot** — SimpleX Chat supports routing traffic through Tor via a SOCKS proxy (Orbot on Android) since v3.1. SimpleX servers can be available on both a public address and a `.onion` address simultaneously, so Tor users get end-to-end onion routing for maximum anonymity.
+- **Security code verification** — after connecting to a contact, you can verify the connection's security code out-of-band (in person or via a video call) to confirm that no man-in-the-middle attack occurred during the initial key exchange.

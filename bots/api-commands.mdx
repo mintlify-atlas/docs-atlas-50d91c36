@@ -1,0 +1,711 @@
+---
+title: "SimpleX Bot API: Chat Commands Reference"
+sidebarTitle: "Commands"
+description: "Full reference for all SimpleX WebSocket API commands — address management, messaging, groups, connections, user profiles, and file transfers."
+---
+
+Commands are sent as JSON text frames over the WebSocket connection. Each command carries a `corrId` (any unique string you choose) and a `cmd` string in the same wire format used by the SimpleX Chat CLI console:
+
+```json
+{"corrId": "42", "cmd": "/_address 1"}
+```
+
+The CLI processes the command and responds with the same `corrId` in the `resp` envelope:
+
+```json
+{"corrId": "42", "resp": {"type": "userContactLinkCreated", "connLinkContact": {"connFullLink": "simplex:/contact#..."}}}
+```
+
+Every command also has a `chatCmdError` error response that is returned when the command fails. Your bot should always handle this case.
+
+**Network usage** is noted for each command:
+- **none** — no network requests are made
+- **interactive** — network requests complete before the response is sent
+- **background** — the response is returned before scheduled network requests are sent
+
+<Note>
+Command syntax in this reference uses the raw CLI wire format. The TypeScript (`ChatClient`) and Python (`Bot`) SDKs wrap these commands in typed methods so you rarely need to construct the strings by hand.
+</Note>
+
+## Command envelope
+
+```json
+// Request
+{"corrId": "42", "cmd": "/_address 1"}
+
+// Success response
+{"corrId": "42", "resp": {"type": "userContactLinkCreated", "user": {...}, "connLinkContact": {...}}}
+
+// Error response
+{"corrId": "42", "resp": {"type": "chatCmdError", "chatError": {"type": "error", "errorType": {...}}}}
+```
+
+---
+
+<AccordionGroup>
+
+  <Accordion title="Address Management">
+    Commands to create and manage your bot's long-term SimpleX contact address. Most bots create their address once at startup and configure auto-accept.
+
+    **APICreateMyAddress** — Create the bot's SimpleX contact address.
+
+    *Network: interactive*
+
+    ```
+    /_address <userId>
+    ```
+
+    Success response: `userContactLinkCreated`
+    - `user`: [User](/bots/api-types#user)
+    - `connLinkContact`: [CreatedConnLink](/bots/api-types#createdconnlink)
+
+    ---
+
+    **APIDeleteMyAddress** — Delete the bot's address. Existing contacts are unaffected.
+
+    *Network: background*
+
+    ```
+    /_delete_address <userId>
+    ```
+
+    Success response: `userContactLinkDeleted`
+    - `user`: [User](/bots/api-types#user)
+
+    ---
+
+    **APIShowMyAddress** — Retrieve the bot's current address and settings.
+
+    *Network: none*
+
+    ```
+    /_show_address <userId>
+    ```
+
+    Success response: `userContactLink`
+    - `user`: [User](/bots/api-types#user)
+    - `contactLink`: [UserContactLink](/bots/api-types#usercontactlink)
+
+    ---
+
+    **APISetProfileAddress** — Include or remove the address from the bot's shared profile.
+
+    *Network: interactive*
+
+    ```
+    /_profile_address <userId> on|off
+    ```
+
+    Success response: `userProfileUpdated`
+    - `user`: [User](/bots/api-types#user)
+    - `fromProfile`, `toProfile`: [Profile](/bots/api-types#profile)
+
+    ---
+
+    **APISetAddressSettings** — Configure auto-accept behaviour and optional auto-reply message.
+
+    *Network: interactive*
+
+    ```
+    /_address_settings <userId> <json(settings)>
+    ```
+
+    `settings` is an [AddressSettings](/bots/api-types#addresssettings) object:
+    ```json
+    {
+      "businessAddress": false,
+      "autoAccept": {"acceptIncognito": false},
+      "autoReply": {"type": "text", "text": "Thanks for connecting!"}
+    }
+    ```
+
+    Success response: `userContactLinkUpdated`
+    - `user`: [User](/bots/api-types#user)
+    - `contactLink`: [UserContactLink](/bots/api-types#usercontactlink)
+  </Accordion>
+
+  <Accordion title="Messaging">
+    Commands to send, edit, delete, and react to messages.
+
+    **APISendMessages** — Send one or more messages to a contact or group.
+
+    *Network: background*
+
+    ```
+    /_send @<contactId> json [{"msgContent": {"type": "text", "text": "Hello"}, "mentions": {}}]
+    /_send #<groupId> json [{"msgContent": {"type": "text", "text": "Hello group"}, "mentions": {}}]
+    ```
+
+    Optional modifiers: `live=on` (live message), `ttl=<seconds>` (timed message).
+
+    Success response: `newChatItems`
+    - `user`: [User](/bots/api-types#user)
+    - `chatItems`: array of [AChatItem](/bots/api-types#achatitem)
+
+    ---
+
+    **APIUpdateChatItem** — Edit a previously sent message.
+
+    *Network: background*
+
+    ```
+    /_update item @<contactId> <itemId> json {"msgContent": {"type": "text", "text": "Edited"}, "mentions": {}}
+    ```
+
+    Success response: `chatItemUpdated`
+    - `user`: [User](/bots/api-types#user)
+    - `chatItem`: [AChatItem](/bots/api-types#achatitem)
+
+    Error: `invalidChatItemUpdate` — not the bot's message, or the message cannot be edited.
+
+    ---
+
+    **APIDeleteChatItem** — Delete one or more messages.
+
+    *Network: background*
+
+    ```
+    /_delete item @<contactId> <itemId>[,<itemId2>...] broadcast|internal|internalMark|history
+    ```
+
+    Delete modes:
+    - `broadcast` — delete for both parties (notifies contact)
+    - `internal` — local delete only (no network)
+    - `internalMark` — mark as deleted locally
+    - `history` — delete from history
+
+    Success response: `chatItemsDeleted`
+    - `user`: [User](/bots/api-types#user)
+    - `chatItemDeletions`: array of [ChatItemDeletion](/bots/api-types#chatitemdeletion)
+
+    ---
+
+    **APIDeleteMemberChatItem** — Moderate (delete) a group member's message. Requires Moderator role or higher.
+
+    *Network: background*
+
+    ```
+    /_delete member item #<groupId> <itemId>[,<itemId2>...]
+    ```
+
+    Success response: `chatItemsDeleted`
+
+    ---
+
+    **APIChatItemReaction** — Add or remove a reaction emoji from a message.
+
+    *Network: background*
+
+    ```
+    /_reaction @<contactId> <itemId> on|off {"type": "emoji", "emoji": "👍"}
+    /_reaction #<groupId> <itemId> on|off {"type": "emoji", "emoji": "👍"}
+    ```
+
+    Success response: `chatItemReaction`
+    - `user`: [User](/bots/api-types#user)
+    - `added`: boolean
+    - `reaction`: [ACIReaction](/bots/api-types#acireaction)
+  </Accordion>
+
+  <Accordion title="Connections">
+    Commands to create invitations and connect to other SimpleX users. Most bots use address-based auto-accept and do not need these commands.
+
+    **APIAddContact** — Generate a new one-time invitation link.
+
+    *Network: interactive*
+
+    ```
+    /_connect <userId>
+    # With incognito profile:
+    /_connect <userId> incognito=on
+    ```
+
+    Success response: `invitation`
+    - `user`: [User](/bots/api-types#user)
+    - `connLinkInvitation`: [CreatedConnLink](/bots/api-types#createdconnlink)
+    - `connection`: [PendingContactConnection](/bots/api-types#pendingcontactconnection)
+
+    ---
+
+    **APIConnectPlan** — Inspect a SimpleX link before connecting: determine link type and whether already connected.
+
+    *Network: interactive*
+
+    ```
+    /_connect plan <userId> <link>
+    ```
+
+    Success response: `connectionPlan`
+    - `connectionPlan`: [ConnectionPlan](/bots/api-types#connectionplan)
+
+    ---
+
+    **APIConnect** — Connect using a prepared SimpleX link (invitation, contact address, or group link).
+
+    *Network: interactive*
+
+    ```
+    /_connect <userId> <link>
+    ```
+
+    Possible success responses: `sentConfirmation`, `sentInvitation`, `contactAlreadyExists`
+
+    ---
+
+    **Connect** — Connect via a SimpleX link using the active user profile (simpler variant of APIConnect).
+
+    *Network: interactive*
+
+    ```
+    /connect <link>
+    ```
+
+    ---
+
+    **APIAcceptContact** — Accept an incoming contact request (when auto-accept is disabled).
+
+    *Network: interactive*
+
+    ```
+    /_accept <contactReqId>
+    ```
+
+    Success response: `acceptingContactRequest`
+    - `user`: [User](/bots/api-types#user)
+    - `contact`: [Contact](/bots/api-types#contact)
+
+    ---
+
+    **APIRejectContact** — Reject an incoming contact request. The requester is **not notified**.
+
+    *Network: none*
+
+    ```
+    /_reject <contactReqId>
+    ```
+
+    Success response: `contactRequestRejected`
+  </Accordion>
+
+  <Accordion title="Groups">
+    Commands to create and manage groups. These commands also apply to business address chats, which are groups under the hood.
+
+    **APINewGroup** — Create a new group.
+
+    *Network: none*
+
+    ```
+    /_group <userId> {"displayName": "My Group", "fullName": ""}
+    # With incognito:
+    /_group <userId> incognito=on {"displayName": "My Group", "fullName": ""}
+    ```
+
+    Success response: `groupCreated`
+    - `user`: [User](/bots/api-types#user)
+    - `groupInfo`: [GroupInfo](/bots/api-types#groupinfo)
+
+    ---
+
+    **APIAddMember** — Add a contact to a group. Requires Admin role.
+
+    *Network: interactive*
+
+    ```
+    /_add #<groupId> <contactId> member
+    # Role options: relay|observer|author|member|moderator|admin|owner
+    ```
+
+    Success response: `sentGroupInvitation`
+
+    ---
+
+    **APIJoinGroup** — Accept a group invitation and join the group.
+
+    *Network: interactive*
+
+    ```
+    /_join #<groupId>
+    ```
+
+    Success response: `userAcceptedGroupSent`
+
+    ---
+
+    **APIAcceptMember** — Accept a pending group member after review. Requires Admin role.
+
+    *Network: background*
+
+    ```
+    /_accept member #<groupId> <groupMemberId> member
+    ```
+
+    Success response: `memberAccepted`
+
+    Error: `groupMemberNotActive` — member has not connected yet.
+
+    ---
+
+    **APIMembersRole** — Change the role of one or more members. Requires Admin role.
+
+    *Network: background*
+
+    ```
+    /_member role #<groupId> <memberId>[,<memberId2>...] moderator
+    ```
+
+    Success response: `membersRoleUser`
+
+    ---
+
+    **APIBlockMembersForAll** — Block or unblock members for all group participants. Requires Moderator role.
+
+    *Network: background*
+
+    ```
+    /_block #<groupId> <memberId>[,<memberId2>...] blocked=on
+    /_block #<groupId> <memberId>[,<memberId2>...] blocked=off
+    ```
+
+    Success response: `membersBlockedForAllUser`
+
+    ---
+
+    **APIRemoveMembers** — Remove members from the group. Requires Admin role.
+
+    *Network: background*
+
+    ```
+    /_remove #<groupId> <memberId>[,<memberId2>...]
+    # Also delete their messages:
+    /_remove #<groupId> <memberId>[,<memberId2>...] messages=on
+    ```
+
+    Success response: `userDeletedMembers`
+
+    Error: `groupMemberNotFound`
+
+    ---
+
+    **APILeaveGroup** — Leave a group.
+
+    *Network: background*
+
+    ```
+    /_leave #<groupId>
+    ```
+
+    Success response: `leftMemberUser`
+
+    ---
+
+    **APIListMembers** — List all members of a group.
+
+    *Network: none*
+
+    ```
+    /_members #<groupId>
+    ```
+
+    Success response: `groupMembers`
+    - `user`: [User](/bots/api-types#user)
+    - `group`: [Group](/bots/api-types#group) (includes `members` array)
+
+    ---
+
+    **APIUpdateGroupProfile** — Update the group's display name, description, or preferences.
+
+    *Network: background*
+
+    ```
+    /_group_profile #<groupId> {"displayName": "New Name", "fullName": ""}
+    ```
+
+    Success response: `groupUpdated`
+  </Accordion>
+
+  <Accordion title="Group Links">
+    Commands for creating and managing join links for groups. Useful for bots that manage public communities.
+
+    **APICreateGroupLink** — Create a group join link with a specified default member role.
+
+    *Network: interactive*
+
+    ```
+    /_create link #<groupId> member
+    # Role options: relay|observer|author|member|moderator|admin|owner
+    ```
+
+    Success response: `groupLinkCreated`
+    - `groupLink`: [GroupLink](/bots/api-types#grouplink)
+
+    ---
+
+    **APIGroupLinkMemberRole** — Change the default member role for an existing group link.
+
+    *Network: none*
+
+    ```
+    /_set link role #<groupId> observer
+    ```
+
+    Success response: `groupLink`
+
+    ---
+
+    **APIDeleteGroupLink** — Delete the group join link.
+
+    *Network: background*
+
+    ```
+    /_delete link #<groupId>
+    ```
+
+    Success response: `groupLinkDeleted`
+
+    ---
+
+    **APIGetGroupLink** — Retrieve the current group join link.
+
+    *Network: none*
+
+    ```
+    /_get link #<groupId>
+    ```
+
+    Success response: `groupLink`
+    - `groupLink`: [GroupLink](/bots/api-types#grouplink)
+  </Accordion>
+
+  <Accordion title="Files">
+    Files are **sent as part of messages** using `APISendMessages` with a `fileSource` field in the composed message. These commands manage receiving and cancelling file transfers.
+
+    **ReceiveFile** — Accept an incoming file transfer.
+
+    *Network: none* (download starts in background)
+
+    ```
+    /freceive <fileId>
+    # With options:
+    /freceive <fileId> approved_relays=on encrypt=on /path/to/save/file.ext
+    ```
+
+    Parameters:
+    - `approved_relays=on` — approve connecting to XFTP relay servers
+    - `encrypt=on|off` — store the file encrypted at rest
+    - `inline=on|off` — receive inline (SMP files only)
+    - optional file path — where to save the file
+
+    Success response: `rcvFileAccepted`
+    - `user`: [User](/bots/api-types#user)
+    - `chatItem`: [AChatItem](/bots/api-types#achatitem)
+
+    ---
+
+    **CancelFile** — Cancel an in-progress file transfer (sending or receiving).
+
+    *Network: background*
+
+    ```
+    /fcancel <fileId>
+    ```
+
+    Success responses: `sndFileCancelled` or `rcvFileCancelled`
+
+    Error: `fileCancel` — file cannot be cancelled.
+  </Accordion>
+
+  <Accordion title="Chat Management">
+    Commands for listing and deleting conversations.
+
+    **APIListContacts** — List all contacts for a user.
+
+    *Network: none*
+
+    ```
+    /_contacts <userId>
+    ```
+
+    Success response: `contactsList`
+    - `contacts`: array of [Contact](/bots/api-types#contact)
+
+    ---
+
+    **APIListGroups** — List all groups for a user.
+
+    *Network: none*
+
+    ```
+    /_groups <userId>
+    # Filter by contact membership:
+    /_groups <userId> @<contactId>
+    # With search:
+    /_groups <userId> <searchQuery>
+    ```
+
+    Success response: `groupsList`
+    - `groups`: array of [GroupInfo](/bots/api-types#groupinfo)
+
+    ---
+
+    **APIGetChats** — Get paginated chat previews. Prefer this over `APIListContacts`/`APIListGroups` at scale — those commands load all records into memory.
+
+    *Network: none*
+
+    ```
+    /_get chats <userId> count=<n> {"type": "filters", "favorite": false, "unread": false}
+    ```
+
+    Success response: `apiChats`
+    - `chats`: array of [AChat](/bots/api-types#achat)
+
+    ---
+
+    **APIDeleteChat** — Delete a contact or group chat.
+
+    *Network: background*
+
+    ```
+    /_delete @<contactId> full
+    /_delete #<groupId> full notify=off
+    ```
+
+    Delete modes: `full`, `entity`, `messages`
+
+    ---
+
+    **APISetContactCustomData** — Store arbitrary JSON data on a contact record (bot-side only, not shared).
+
+    *Network: none*
+
+    ```
+    /_set custom @<contactId> {"key": "value"}
+    ```
+
+    ---
+
+    **APISetGroupCustomData** — Store arbitrary JSON data on a group record.
+
+    *Network: none*
+
+    ```
+    /_set custom #<groupId> {"key": "value"}
+    ```
+  </Accordion>
+
+  <Accordion title="User Profile">
+    Most bots configure their profile manually via the CLI or desktop app before deploying. These commands are for bots that manage multiple user profiles programmatically.
+
+    **ShowActiveUser** — Get the currently active user profile.
+
+    *Network: none*
+
+    ```
+    /user
+    ```
+
+    Success response: `activeUser`
+    - `user`: [User](/bots/api-types#user)
+
+    ---
+
+    **CreateActiveUser** — Create a new user profile.
+
+    *Network: none*
+
+    ```
+    /_create user {"profile": {"displayName": "Bot Name", "fullName": ""}, "pastTimestamp": false}
+    ```
+
+    Success response: `activeUser`
+
+    Errors: `userExists`, `invalidDisplayName`
+
+    ---
+
+    **ListUsers** — List all user profiles in the database.
+
+    *Network: none*
+
+    ```
+    /users
+    ```
+
+    Success response: `usersList`
+    - `users`: array of [UserInfo](/bots/api-types#userinfo)
+
+    ---
+
+    **APISetActiveUser** — Switch the active user profile.
+
+    *Network: none*
+
+    ```
+    /_user <userId>
+    ```
+
+    Success response: `activeUser`
+
+    Error: `chatNotStarted`
+
+    ---
+
+    **APIDeleteUser** — Delete a user profile.
+
+    *Network: background*
+
+    ```
+    /_delete user <userId> del_smp=on
+    # Without deleting SMP queues:
+    /_delete user <userId> del_smp=off
+    ```
+
+    Success response: `cmdOk`
+
+    ---
+
+    **APIUpdateProfile** — Update a user's profile. Use this to set `peerType: "bot"` and configure bot commands.
+
+    *Network: background*
+
+    ```
+    /_profile <userId> {"displayName": "My Bot", "fullName": "", "peerType": "bot"}
+    ```
+
+    Success responses: `userProfileUpdated` or `userProfileNoChange`
+
+    ---
+
+    **APISetContactPrefs** — Override preferences for a specific contact (e.g. configure different bot command menus per user).
+
+    *Network: background*
+
+    ```
+    /_set prefs @<contactId> {"commands": [{"type": "command", "keyword": "/help", "label": "Help"}]}
+    ```
+
+    Success response: `contactPrefsUpdated`
+  </Accordion>
+
+  <Accordion title="Chat Control">
+    These commands control the chat engine lifecycle. They are managed automatically when using the CLI as a WebSocket server and are not typically needed in bot code.
+
+    **StartChat** — Start the chat controller.
+
+    ```
+    /_start
+    ```
+
+    Success responses: `chatStarted` or `chatRunning`
+
+    ---
+
+    **APIStopChat** — Stop the chat controller.
+
+    ```
+    /_stop
+    ```
+
+    Success response: `chatStopped`
+  </Accordion>
+
+</AccordionGroup>

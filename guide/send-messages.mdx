@@ -1,0 +1,67 @@
+---
+title: "Sending Messages and Reactions in SimpleX Chat"
+sidebarTitle: "Send Messages"
+description: "Send text, voice messages, and reactions in SimpleX Chat. Use disappearing messages, delete for everyone, or reply to specific messages in any chat."
+---
+
+SimpleX Chat supports a rich set of message types — from plain text and formatted Markdown, to voice notes, images, files, emoji reactions, and live messages — all end-to-end encrypted and stored exclusively on your device and your recipient's device.
+
+## Message types
+
+- **Text messages** — Plain text with Markdown formatting support. Type in the message box and tap **Send**.
+- **Voice messages** — Tap and hold the 🎤 microphone button to record; release to stop. Review before sending, then tap **Send**. If the microphone button appears gray, voice messages are disabled in that conversation.
+- **Images and videos** — Tap the 📎 paperclip icon, then choose **Use Camera**, **From Gallery**, or **Choose file**. On iOS you can also paste directly from the clipboard.
+- **Files (via XFTP)** — Any file type can be attached using the same paperclip menu. SimpleX uses the XFTP protocol for metadata-private, E2E-encrypted transfers. See [File Transfer](/guide/file-transfer) for details.
+- **Message reactions** — Six emoji reactions are available. Long-press (Android) or tap-and-hold (iOS) any message to add a reaction.
+- **Replies to specific messages** — Long-press a message and choose **Reply** to quote it in your response. The recipient sees the original message alongside your reply.
+- **Live messages** — Tap the ⚡️ lightning button to stream your message to the recipient as you type it, word by word, before you tap **Send**. Useful for real-time conversations or live reporting in urgent situations.
+
+## Message delivery status
+
+Each sent message displays a checkmark indicator:
+
+| Status | Meaning |
+|--------|---------|
+| ✓ (one checkmark) | Message delivered to the relay server and accepted for onward delivery |
+| ✓✓ (two checkmarks) | Message delivered to the recipient's device |
+
+There are no read receipts by design. Delivery receipts equally benefit both sides of a conversation; read receipts create social pressure on recipients and benefit app developers more than users.
+
+<Note>
+  All messages are stored only on the devices of participants — they are deleted from relay servers immediately after delivery. No message content is retained server-side at any point.
+</Note>
+
+## Disappearing messages
+
+Disappearing messages auto-delete from both devices after a configurable time period once they have been read.
+
+To enable disappearing messages in a conversation:
+
+1. Tap the **contact or group name** at the top of the conversation.
+2. Toggle the slider next to **Disappearing messages**.
+3. Set the **Delete after** duration (e.g., 1 minute, 1 hour, 1 week).
+
+<Note>
+  Both parties must enable disappearing messages for the feature to take effect. In a group, only the group owner can turn this on.
+</Note>
+
+## Delete for everyone
+
+Either party can delete a sent message within **24 hours** of sending it, and the deletion propagates to the recipient's device.
+
+- **Delete for everyone** — Permanently removes the message from both devices (requires both contacts to have "Delete for everyone" enabled in Contact preferences).
+- **Delete for me** — Removes the message only from your local device; the recipient's copy is unaffected.
+
+To delete a message, long-press it and choose **Delete**, then select the appropriate option.
+
+If "Delete for everyone" is not mutually enabled, you can still **mark** a sent message as deleted. The recipient will see a "deleted message" placeholder and can choose to reveal the original content.
+
+## Editing messages
+
+You can edit any message you have already sent:
+
+1. Long-press the message.
+2. Choose **Edit**.
+3. Make your changes and tap **Save**.
+
+The recipient's app displays the updated message and can view the **edit history** to see all prior versions of the message.

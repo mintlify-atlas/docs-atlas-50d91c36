@@ -1,0 +1,66 @@
+---
+title: "Sending Files with XFTP — SimpleX's Metadata-Private Protocol"
+sidebarTitle: "File Transfer"
+description: "SimpleX uses XFTP for file transfers: end-to-end encrypted, chunked across multiple servers, with no metadata linking sender and recipient traffic."
+---
+
+SimpleX uses **XFTP (eXtended File Transfer Protocol)** — a purpose-built protocol designed so that file transfers leak as little metadata as possible. Unlike conventional file hosting or attachment systems where a single server sees both the upload and the download, XFTP architecturally separates sender and recipient traffic so that no single party can correlate the two.
+
+## How XFTP works
+
+- **Fixed-size chunks** — Files are split into uniform-sized chunks before upload, so that chunk size alone reveals nothing about the file.
+- **Multiple relay servers** — Chunks are distributed across separate XFTP relay servers, making it difficult to reconstruct the file by observing any single server.
+- **End-to-end encryption** — Each chunk is encrypted with NaCl (Curve25519 + XSalsa20-Poly1305) before leaving your device. The relay server receives only ciphertext.
+- **No shared identifiers** — Sender upload traffic and recipient download traffic share no common tokens, cookies, or session identifiers. A relay server cannot link who sent a file to who received it.
+- **Temporary storage** — Files are stored on relay servers for a maximum of **48 hours** after upload, then automatically purged.
+- **Efficient multi-recipient delivery** — A sender uploads a file **once**; multiple recipients (e.g., group members) each download their own copy without the sender needing to re-upload.
+
+## Sending a file
+
+<Steps>
+  <Step title="Open a chat">
+    Navigate to any direct or group conversation in SimpleX Chat.
+  </Step>
+  <Step title="Tap the attachment icon">
+    Tap the 📎 **paperclip** button to the left of the message entry box.
+  </Step>
+  <Step title="Choose a file">
+    Select **Use Camera**, **From Gallery**, or **Choose file** to pick what you want to send.
+  </Step>
+  <Step title="Send">
+    The file uploads automatically in the background. Once the upload finishes a tick appears in the corner of the preview — tap **Send** to deliver the message with the attachment.
+  </Step>
+</Steps>
+
+## CLI file commands
+
+```text
+/file <contact> <path>         Send a file to a contact
+/file_status <file_id>         Check the transfer status of a file
+/cancel_file <file_id>         Cancel an in-progress file transfer
+```
+
+## File size limits
+
+File size is constrained by the storage available on the XFTP relay server handling the transfer. Self-hosted XFTP servers can be configured with a storage quota — the default is **1 GB per chunk set**. Files exceeding the relay's configured limit will not upload.
+
+<Tip>
+  Use your own XFTP server for full control over file storage quotas, retention periods, and access. See the XFTP server hosting guide for setup instructions.
+</Tip>
+
+## Privacy guarantees
+
+<CardGroup cols={2}>
+  <Card title="No correlation" icon="link-slash" href="/guide/file-transfer">
+    Sender upload chunks and recipient download chunks carry no common identifiers. A relay server operator cannot determine who sent a file or who received it.
+  </Card>
+  <Card title="Sender IP protection" icon="eye-slash" href="/guide/file-transfer">
+    Recipients download chunks directly from the XFTP relay — they never connect to the sender's device and cannot observe the sender's IP address.
+  </Card>
+  <Card title="Temporary storage" icon="clock" href="/guide/file-transfer">
+    Files are automatically purged from relay servers after 48 hours or immediately upon cancellation. No persistent file archive is kept server-side.
+  </Card>
+  <Card title="E2E encrypted" icon="lock" href="/guide/file-transfer">
+    File content is encrypted on your device before upload using NaCl. The relay server stores and forwards only ciphertext and cannot read your files.
+  </Card>
+</CardGroup>

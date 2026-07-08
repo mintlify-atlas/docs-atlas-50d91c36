@@ -1,0 +1,56 @@
+---
+title: "SimpleX Chat: Private Messaging With No User Identifiers"
+sidebarTitle: "Introduction"
+description: "SimpleX Chat is an open-source messaging platform with no user identifiers of any kind — 100% private by design, audited by Trail of Bits."
+---
+
+SimpleX Chat is the first messaging platform that has **no user identifiers of any kind** — not a phone number, not a username, not a public key, not even a random number. Unlike every other messaging platform in existence, SimpleX has no way to identify who you are or who you talk to. Connections are established through one-time invitation links or optional temporary addresses, and all messages and contacts are stored only on your device. The result is a platform that is 100% private by design, not by policy — and one that has been independently audited twice by [Trail of Bits](https://www.trailofbits.com/about).
+
+<CardGroup cols={2}>
+  <Card title="Why SimpleX" icon="shield-halved" href="why-simplex">
+    Learn why identifier-free messaging protects both message content and metadata, and how SimpleX compares to Signal, XMPP, Matrix, and P2P protocols.
+  </Card>
+  <Card title="Security & Privacy" icon="lock" href="security-and-privacy">
+    Explore SimpleX's layered encryption model, Trail of Bits audit results, vulnerability reporting policy, and in-app privacy features.
+  </Card>
+  <Card title="Install Mobile App" icon="mobile" href="getting-started/install-mobile">
+    Get SimpleX Chat on iOS or Android — available on the App Store, Google Play, F-Droid, and as a direct APK.
+  </Card>
+  <Card title="Install CLI" icon="terminal" href="getting-started/install-cli">
+    Run SimpleX Chat as a terminal application on Linux, macOS, or Windows — ideal for scripting, bots, and server-side integrations.
+  </Card>
+</CardGroup>
+
+## What makes SimpleX different
+
+- **No user identifiers of any kind** — SimpleX does not assign phone numbers, usernames, public keys, or random identifiers to users. Instead it uses pairwise per-queue addresses, so there is no metadata in common between your conversations with different contacts. Even SimpleX's own servers do not know how many people use the platform.
+- **Double ratchet E2E encryption with NaCl crypto_box** — every conversation uses the same double ratchet algorithm as Signal (with forward secrecy and break-in recovery), plus an additional NaCl `crypto_box` encryption layer on each message queue and a further server-to-recipient encryption layer to prevent traffic correlation.
+- **Post-quantum resistant key exchange** — since v5.6, the double ratchet protocol performs post-quantum resistant key exchange on every ratchet step, protecting against future quantum computing attacks.
+- **Decentralized SMP relay network** — messages pass through redundant, disposable SimpleX Messaging Protocol (SMP) relay nodes that hold messages only until they are received. Servers do not store user accounts, do not communicate with each other, and cannot be enumerated. You can run your own server and still talk to users on any other SimpleX server.
+- **XFTP file protocol** — large files and media are sent end-to-end encrypted using the SimpleX File Transfer Protocol (XFTP), which significantly reduces metadata leaks compared to conventional file delivery.
+- **Mobile, desktop, and terminal CLI apps** — full-featured apps for Android (Google Play, F-Droid, APK) and iOS, a desktop client for Linux, macOS, and Windows, and a terminal CLI for scripting and automation.
+- **Incognito mode** — when enabled, a new random profile name is generated for each new contact or group, so no shared data is revealed across connections.
+- **Bot and developer API** — SimpleX exposes a WebSocket-based bot API and a TypeScript client SDK, enabling chat bots and integrations in any language.
+- **Private message routing** — from v6.0, all clients use private message routing by default, concealing your IP address from servers chosen by your contacts via a two-hop onion packet routing scheme.
+
+## Supported platforms
+
+| Platform | Distribution |
+|---|---|
+| **iOS** | App Store, TestFlight (beta) |
+| **Android** | Google Play, F-Droid, direct APK |
+| **Desktop** (Linux, macOS, Windows) | GitHub Releases |
+| **Terminal CLI** | One-line install script (Linux, macOS, Windows) |
+
+## Security audits
+
+SimpleX has been independently audited by [Trail of Bits](https://www.trailofbits.com/about) on two occasions:
+
+- **November 2022** — implementation security assessment of SimpleX cryptography and networking. The assessment examined the actual code and cryptographic implementations used in the clients and servers.
+- **July 2024** — cryptographic review of SimpleX protocols design. This review examined the protocol specifications and cryptographic design decisions, independent of their implementation.
+
+Both audit reports are published. See the [Security & Privacy](security-and-privacy) page for full details on the audit scope, vulnerability reporting process, and the layered encryption architecture.
+
+<Note>
+SimpleX Chat is free and open-source software licensed under the **GNU Affero General Public License version 3 (AGPL-3.0)**. The source code for clients, servers, and protocols is available on [GitHub](https://github.com/simplex-chat/simplex-chat). The SimpleX protocols are open and in the public domain, so anyone can build future implementations of clients and servers.
+</Note>

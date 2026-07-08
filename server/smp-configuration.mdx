@@ -1,0 +1,203 @@
+---
+title: "Configure and Secure Your SMP Server"
+sidebarTitle: "SMP Configuration"
+description: "Configure SMP server settings including TLS certificates, message storage limits, control port, daily stats, and online certificate rotation."
+---
+
+All SMP server configuration lives in `/etc/opt/simplex/smp-server.ini`. The file is created automatically by `smp-server init` and contains every available option with inline documentation. Stored messages, connection state, statistics, and server logs are kept in `/var/opt/simplex/`.
+
+## Key configuration options
+
+The table below covers the most commonly tuned settings. Each option maps to a field inside `smp-server.ini`; the section name is shown in the description where it differs from the option name.
+
+| Option | Description | Default |
+|---|---|---|
+| `store-log` | Persist queue and subscription state to an append-only log so they survive restarts (`[STORE_LOG] enable`) | `off` |
+| `restore-messages` | Save undelivered messages to disk so they are restored after a restart (`[STORE_LOG] restore_messages`) | `on` when store-log is on |
+| `expire-messages-days` | Delete undelivered messages older than this many days (`[STORE_LOG] expire_messages_days`) | `21` |
+| `control-port` | Enable the admin control port on 5224 (`[TRANSPORT] control_port`) | disabled |
+| `socks-proxy` | Enable SOCKS5 proxy for outbound connections to Tor-only servers (`[PROXY] socks_proxy`) | disabled |
+| `no-password` | Allow any client to create new messaging queues without a password (`[AUTH] new_queues`) | requires password |
+| `log-stats` | Log daily aggregate statistics to a CSV file (`[STORE_LOG] log_stats`) | `off` |
+
+A condensed example of the most relevant sections:
+
+```ini
+[STORE_LOG]
+enable: on
+restore_messages: on
+expire_messages_days: 21
+log_stats: on
+
+[AUTH]
+new_queues: on
+# create_password: s3cr3t
+
+[TRANSPORT]
+host: smp.example.com
+port: 5223,443
+log_tls_errors: off
+control_port: 5224
+
+[PROXY]
+socks_proxy: localhost:9050
+```
+
+After editing the file, restart the service for changes to take effect:
+
+```sh
+systemctl restart smp-server
+```
+
+## TLS certificates
+
+On `smp-server init`, two key pairs are generated automatically:
+
+- **CA key** (`/etc/opt/simplex/ca.key`) — a long-lived self-signed root used only to sign the server's online certificate. Its fingerprint becomes the stable identifier embedded in the server address.
+- **Online certificate** (`/etc/opt/simplex/server.key` / `server.crt`) — the certificate presented during every TLS handshake. This is what clients actually validate.
+
+Because the fingerprint is part of the server address and clients verify it independently of any certificate authority, there is no need for a CA-signed certificate for the SMP protocol port (5223). Clients that have your server address already know exactly what fingerprint to expect.
+
+<Warning>
+  Move your CA private key (`/etc/opt/simplex/ca.key`) off the server and into secure offline storage as soon as initialization is complete. If the online certificate is ever compromised, the CA key is the only way to rotate it while keeping your existing server address and all established connections intact.
+</Warning>
+
+## Online certificate rotation
+
+Operators are advised to rotate the online certificate periodically (every three months is a reasonable interval). The procedure generates a new online key pair signed by the same CA, so the fingerprint in your server address does not change — clients seamlessly verify the new certificate on their next connection.
+
+Steps (run on your local machine, not the server):
+
+```sh
+# 1. Pull current config from server
+rsync -hzasP <user>@smp.example.com:/etc/opt/simplex/ $HOME/simplex/smp/config/
+
+# 2. Place your CA key backup into the config folder as ca.key
+
+# 3. Generate a new online certificate
+export SMP_SERVER_CFG_PATH=$HOME/simplex/smp/config
+smp-server cert
+
+# 4. Remove the CA key from the local working copy
+rm $HOME/simplex/smp/config/ca.key
+
+# 5. Push the new certificates back to the server
+rsync -hzasP $HOME/simplex/smp/config/ <user>@smp.example.com:/etc/opt/simplex/
+
+# 6. Restart to load the new certificate
+ssh <user>@smp.example.com "systemctl restart smp-server"
+```
+
+## Control port
+
+The control port (default: **5224**) provides a live administrative interface without requiring a server restart. It is protected by separate admin and user passwords that must be set in `smp-server.ini` before enabling it.
+
+```ini
+[AUTH]
+control_port_admin_password: <your_admin_password>
+control_port_user_password: <your_user_password>
+
+[TRANSPORT]
+control_port: 5224
+```
+
+Connect with `nc` or `telnet` from localhost:
+
+```sh
+nc 127.0.0.1 5224
+# or
+telnet 127.0.0.1 5224
+```
+
+After connecting, authenticate with the `auth` command:
+
+```
+auth <your_password>
+```
+
+Available commands:
+
+| Command | Description | Requires `admin` role |
+|---|---|---|
+| `stats` | Real-time server statistics | No |
+| `stats-rts` | GHC/Haskell runtime statistics | No |
+| `clients` | Connected client details (useful for debugging) | Yes |
+| `sockets` | General socket information | No |
+| `socket-threads` | Per-socket thread details | Yes |
+| `threads` | All thread information | Yes |
+| `server-info` | Aggregated server information | No |
+| `delete` | Delete a specific queue (content moderation) | No |
+| `save` | Flush in-memory queues and messages to disk | Yes |
+| `help` | Show the help menu | No |
+| `quit` | Close the control port session | No |
+
+<Warning>
+  Do not expose the control port to the internet — bind it to localhost only. The `control_port: 5224` line in `[TRANSPORT]` defaults to listening on `127.0.0.1`. Verify that port 5224 is not reachable from outside the server with `ufw deny 5224/tcp` or an equivalent firewall rule.
+</Warning>
+
+## Daily statistics
+
+Enable daily statistics by setting `log_stats: on` in the `[STORE_LOG]` section. Logs are written in CSV format to `/var/opt/simplex/smp-server-stats.daily.log` and include:
+
+- Counts of queues created, established, and deleted
+- Messages sent and received
+- Active queue counts (day / week / month windows)
+- Proxy relay request successes and errors
+
+No individual message content or sender/recipient metadata is recorded — only aggregate counters. The CSV file can be imported into **Grafana** using the [CSV datasource plugin](https://grafana.com/grafana/plugins/marcusolsson-csv-datasource/) for visualisation.
+
+## Systemd management
+
+```sh
+systemctl status smp-server        # Check current status
+systemctl start smp-server         # Start the server
+systemctl stop smp-server          # Stop gracefully (sends SIGINT to flush state)
+systemctl restart smp-server       # Restart
+journalctl -u smp-server -f        # Follow live logs
+journalctl -u smp-server --since today   # View today's logs
+```
+
+<Note>
+  Always stop the server with `systemctl stop` (SIGINT) rather than SIGKILL. SIGINT triggers a clean shutdown that writes undelivered messages to the backup file, ensuring they can be restored on the next start.
+</Note>
+
+## Updating the server
+
+**If you used the installation script**, run the provided update helper:
+
+```sh
+sudo simplex-servers-update
+```
+
+To pin a specific version:
+
+```sh
+export VER=v6.3.1
+sudo -E simplex-servers-update
+```
+
+**If you deployed manually**, replace the binary and restart:
+
+```sh
+sudo systemctl stop smp-server
+
+sudo curl -L \
+  https://github.com/simplex-chat/simplexmq/releases/latest/download/smp-server-ubuntu-20_04-x86-64 \
+  -o /usr/local/bin/smp-server
+
+sudo chmod +x /usr/local/bin/smp-server
+sudo systemctl start smp-server
+```
+
+**If you are running Docker**, pull the new image and recreate the container:
+
+```sh
+docker pull simplexchat/smp-server:latest
+docker rm $(docker stop $(docker ps -a -q --filter ancestor=simplexchat/smp-server --format="{{.ID}}"))
+docker run -d \
+  -p 5223:5223 \
+  -p 443:443 \
+  -v /etc/opt/simplex:/etc/opt/simplex \
+  -v /var/opt/simplex:/var/opt/simplex \
+  simplexchat/smp-server:latest
+```

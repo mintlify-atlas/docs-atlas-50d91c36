@@ -1,0 +1,463 @@
+---
+title: "SimpleX Bot API: Chat Events Reference"
+sidebarTitle: "Events"
+description: "Reference for all SimpleX WebSocket API events — contact connections, new messages, group membership changes, file transfers, and network status events."
+---
+
+Events arrive as unsolicited WebSocket text frames — they have no `corrId` field and are not responses to commands. Your bot receives them from the CLI whenever something happens: a contact connects, a message arrives, a group member changes role, a file finishes downloading.
+
+## Event envelope
+
+```json
+{"resp": {"type": "newChatItems", "user": {...}, "chatItems": [...]}}
+```
+
+The `resp.type` field is the discriminant. Your bot should `switch` or `match` on this field and handle each event type it cares about.
+
+<Warning>
+Always handle the case where `resp.type` is an unknown string — new event types are added in releases and the CLI may send events your current bot version has never seen. Your JSON parser must allow additional properties in all objects and silently ignore records with unknown `type` values.
+</Warning>
+
+---
+
+<AccordionGroup>
+
+  <Accordion title="Contact Connection Events">
+    Events fired when contacts connect, update their profiles, or disconnect. Most bots with auto-accept enabled only need `contactConnected` to send a welcome message.
+
+    **`contactConnected`** — A new contact accepted your invitation or connected via your address (non-business).
+
+    Fields:
+    - `user`: [User](/bots/api-types#user)
+    - `contact`: [Contact](/bots/api-types#contact)
+    - `userCustomProfile?`: [Profile](/bots/api-types#profile) — set if bot connected incognito
+
+    ---
+
+    **`contactSndReady`** — Bot can now send messages to this contact (after connecting via a 1-time invitation or after a contact request is accepted). Fired before `contactConnected`.
+
+    Fields:
+    - `user`: [User](/bots/api-types#user)
+    - `contact`: [Contact](/bots/api-types#contact)
+
+    ---
+
+    **`contactUpdated`** — A contact updated their profile (display name, avatar, etc.).
+
+    Fields:
+    - `user`: [User](/bots/api-types#user)
+    - `fromContact`: [Contact](/bots/api-types#contact)
+    - `toContact`: [Contact](/bots/api-types#contact)
+
+    ---
+
+    **`contactDeletedByContact`** — A contact deleted their connection with the bot (the conversation history is preserved locally).
+
+    Fields:
+    - `user`: [User](/bots/api-types#user)
+    - `contact`: [Contact](/bots/api-types#contact)
+
+    ---
+
+    **`receivedContactRequest`** — Someone sent a contact request via your address. Only fired when auto-accept is **disabled**. Use [APIAcceptContact](/bots/api-commands#connections) or [APIRejectContact](/bots/api-commands#connections) to respond.
+
+    Fields:
+    - `user`: [User](/bots/api-types#user)
+    - `contactRequest`: [UserContactRequest](/bots/api-types#usercontactrequest)
+    - `chat_?`: [AChat](/bots/api-types#achat)
+
+    ---
+
+    **`contactConnecting`** — A contact confirmed the connection (during the handshake, before it is fully established). Sent when a contact starts connecting via a 1-time invitation link or when the bot connects to another SimpleX address.
+
+    Fields:
+    - `user`: [User](/bots/api-types#user)
+    - `contact`: [Contact](/bots/api-types#contact)
+
+    ---
+
+    **`acceptingContactRequest`** — Auto-accepting a contact request via the bot's SimpleX address with auto-accept enabled. Informational; no action required.
+
+    Fields:
+    - `user`: [User](/bots/api-types#user)
+    - `contact`: [Contact](/bots/api-types#contact)
+
+    ---
+
+    **`acceptingBusinessRequest`** — Auto-accepting a contact request via the bot's business address.
+
+    Fields:
+    - `user`: [User](/bots/api-types#user)
+    - `groupInfo`: [GroupInfo](/bots/api-types#groupinfo)
+
+    ---
+
+    **`newMemberContactReceivedInv`** — Received an invitation to connect directly with a group member. The connection proceeds automatically; process this event only if you need to track the contact-to-member association.
+
+    Fields:
+    - `user`: [User](/bots/api-types#user)
+    - `contact`: [Contact](/bots/api-types#contact)
+    - `groupInfo`: [GroupInfo](/bots/api-types#groupinfo)
+    - `member`: [GroupMember](/bots/api-types#groupmember)
+  </Accordion>
+
+  <Accordion title="Message Events">
+    Events fired when messages are sent, received, edited, deleted, or reacted to. `newChatItems` is the most important event for most bots.
+
+    **`newChatItems`** — One or more messages arrived (or were sent). This is the primary event for processing incoming messages.
+
+    Fields:
+    - `user`: [User](/bots/api-types#user)
+    - `chatItems`: array of [AChatItem](/bots/api-types#achatitem)
+
+    Each item in `chatItems` has:
+    - `chatInfo` — identifies the chat ([ChatInfo](/bots/api-types#chatinfo): `direct`, `group`, `local`)
+    - `chatItem.content` — the message content ([CIContent](/bots/api-types#cicontent))
+    - `chatItem.meta` — metadata: `itemId`, `itemTs`, `itemText`, `itemEdited`, etc.
+
+    This event is also sent as a response to `APISendMessages` (with a `corrId`), so your bot receives confirmation of its own sent messages through the same event type.
+
+    ---
+
+    **`chatItemUpdated`** — A message was edited by another user (or echoed back after the bot edits its own message).
+
+    Fields:
+    - `user`: [User](/bots/api-types#user)
+    - `chatItem`: [AChatItem](/bots/api-types#achatitem)
+
+    ---
+
+    **`chatItemsDeleted`** — One or more messages were deleted.
+
+    Fields:
+    - `user`: [User](/bots/api-types#user)
+    - `chatItemDeletions`: array of [ChatItemDeletion](/bots/api-types#chatitemdeletion)
+    - `byUser`: boolean — true if the local user deleted them
+    - `timed`: boolean — true if deleted by timed message TTL
+
+    ---
+
+    **`groupChatItemsDeleted`** — Group messages were deleted or moderated.
+
+    Fields:
+    - `user`: [User](/bots/api-types#user)
+    - `groupInfo`: [GroupInfo](/bots/api-types#groupinfo)
+    - `chatItemIDs`: array of int64
+    - `byUser`: boolean
+    - `member_?`: [GroupMember](/bots/api-types#groupmember) — the member who deleted (if known)
+
+    ---
+
+    **`chatItemReaction`** — A reaction was added or removed from a message.
+
+    Fields:
+    - `user`: [User](/bots/api-types#user)
+    - `added`: boolean — true if reaction added, false if removed
+    - `reaction`: [ACIReaction](/bots/api-types#acireaction)
+
+    ---
+
+    **`chatItemsStatusesUpdated`** — Delivery status changed for one or more messages (sent ✓, delivered ✓✓, read).
+
+    Fields:
+    - `user`: [User](/bots/api-types#user)
+    - `chatItems`: array of [AChatItem](/bots/api-types#achatitem)
+  </Accordion>
+
+  <Accordion title="Group Events">
+    Events fired when group membership or configuration changes. Note that business address chats are groups under the hood, so these events apply to them as well.
+
+    **`receivedGroupInvitation`** — The bot was invited to join a group.
+
+    Fields:
+    - `user`: [User](/bots/api-types#user)
+    - `groupInfo`: [GroupInfo](/bots/api-types#groupinfo)
+    - `contact`: [Contact](/bots/api-types#contact) — the member who invited the bot
+    - `fromMemberRole`: [GroupMemberRole](/bots/api-types#groupmemberrole) — inviter's role
+    - `memberRole`: [GroupMemberRole](/bots/api-types#groupmemberrole) — bot's role if it joins
+
+    Use [APIJoinGroup](/bots/api-commands#groups) to accept.
+
+    ---
+
+    **`userJoinedGroup`** — The bot successfully joined a group (after connecting via a group link).
+
+    Fields:
+    - `user`: [User](/bots/api-types#user)
+    - `groupInfo`: [GroupInfo](/bots/api-types#groupinfo)
+    - `hostMember`: [GroupMember](/bots/api-types#groupmember)
+
+    ---
+
+    **`groupUpdated`** — The group profile or preferences were changed.
+
+    Fields:
+    - `user`: [User](/bots/api-types#user)
+    - `fromGroup`: [GroupInfo](/bots/api-types#groupinfo)
+    - `toGroup`: [GroupInfo](/bots/api-types#groupinfo)
+    - `member_?`: [GroupMember](/bots/api-types#groupmember) — member who made the change
+    - `msgSigned?`: [MsgSigStatus](/bots/api-types#msgsigstatus)
+
+    ---
+
+    **`joinedGroupMember`** — A new member joined the group and is now connected.
+
+    Fields:
+    - `user`: [User](/bots/api-types#user)
+    - `groupInfo`: [GroupInfo](/bots/api-types#groupinfo)
+    - `member`: [GroupMember](/bots/api-types#groupmember)
+
+    ---
+
+    **`memberRole`** — A member's role was changed (including the bot's own role).
+
+    Fields:
+    - `user`: [User](/bots/api-types#user)
+    - `groupInfo`: [GroupInfo](/bots/api-types#groupinfo)
+    - `byMember`: [GroupMember](/bots/api-types#groupmember)
+    - `member`: [GroupMember](/bots/api-types#groupmember)
+    - `fromRole`, `toRole`: [GroupMemberRole](/bots/api-types#groupmemberrole)
+
+    ---
+
+    **`deletedMember`** — A member was removed from the group by an admin.
+
+    Fields:
+    - `user`: [User](/bots/api-types#user)
+    - `groupInfo`: [GroupInfo](/bots/api-types#groupinfo)
+    - `byMember`: [GroupMember](/bots/api-types#groupmember)
+    - `deletedMember`: [GroupMember](/bots/api-types#groupmember)
+    - `withMessages`: boolean
+
+    ---
+
+    **`deletedMemberUser`** — The bot itself was removed from the group.
+
+    Fields:
+    - `user`: [User](/bots/api-types#user)
+    - `groupInfo`: [GroupInfo](/bots/api-types#groupinfo)
+    - `member`: [GroupMember](/bots/api-types#groupmember) — the admin who removed the bot
+    - `withMessages`: boolean
+
+    ---
+
+    **`leftMember`** — A member voluntarily left the group.
+
+    Fields:
+    - `user`: [User](/bots/api-types#user)
+    - `groupInfo`: [GroupInfo](/bots/api-types#groupinfo)
+    - `member`: [GroupMember](/bots/api-types#groupmember)
+
+    ---
+
+    **`groupDeleted`** — The group was deleted by the owner.
+
+    Fields:
+    - `user`: [User](/bots/api-types#user)
+    - `groupInfo`: [GroupInfo](/bots/api-types#groupinfo)
+    - `member`: [GroupMember](/bots/api-types#groupmember) — the owner
+
+    ---
+
+    **`memberBlockedForAll`** — A member was blocked (or unblocked) for all participants by a moderator.
+
+    Fields:
+    - `user`: [User](/bots/api-types#user)
+    - `groupInfo`: [GroupInfo](/bots/api-types#groupinfo)
+    - `byMember`: [GroupMember](/bots/api-types#groupmember)
+    - `member`: [GroupMember](/bots/api-types#groupmember)
+    - `blocked`: boolean
+
+    ---
+
+    **`connectedToGroupMember`** — Direct connection to a group member established.
+
+    Fields:
+    - `user`: [User](/bots/api-types#user)
+    - `groupInfo`: [GroupInfo](/bots/api-types#groupinfo)
+    - `member`: [GroupMember](/bots/api-types#groupmember)
+    - `memberContact?`: [Contact](/bots/api-types#contact)
+
+    ---
+
+    **`memberAcceptedByOther`** — Another admin or moderator accepted a pending member.
+
+    Fields:
+    - `user`: [User](/bots/api-types#user)
+    - `groupInfo`: [GroupInfo](/bots/api-types#groupinfo)
+    - `acceptingMember`: [GroupMember](/bots/api-types#groupmember)
+    - `member`: [GroupMember](/bots/api-types#groupmember)
+
+    ---
+
+    **`groupMemberUpdated`** — Another member's profile was updated.
+
+    Fields:
+    - `user`: [User](/bots/api-types#user)
+    - `groupInfo`: [GroupInfo](/bots/api-types#groupinfo)
+    - `fromMember`, `toMember`: [GroupMember](/bots/api-types#groupmember)
+  </Accordion>
+
+  <Accordion title="File Events">
+    Events tracking file transfer progress. Bots that send or receive files should process these to confirm delivery and handle errors.
+
+    Bots can also accept or moderate files when processing the `newChatItems` event by calling [ReceiveFile](/bots/api-commands#files) or [APIDeleteMemberChatItem](/bots/api-commands#messaging) from within the handler.
+
+    **`rcvFileDescrReady`** — An incoming file descriptor is ready — the file is ready to be received. Use [ReceiveFile](/bots/api-commands#files) to accept. This event can arrive after `ReceiveFile` is called if the bot accepted before the descriptor arrived.
+
+    Fields:
+    - `user`: [User](/bots/api-types#user)
+    - `chatItem`: [AChatItem](/bots/api-types#achatitem)
+    - `rcvFileTransfer`: [RcvFileTransfer](/bots/api-types#rcvfiletransfer)
+    - `rcvFileDescr`: [RcvFileDescr](/bots/api-types#rcvfiledescr)
+
+    ---
+
+    **`rcvFileAccepted`** — File acceptance confirmed (fired when CLI auto-accepts a file).
+
+    Fields:
+    - `user`: [User](/bots/api-types#user)
+    - `chatItem`: [AChatItem](/bots/api-types#achatitem)
+
+    ---
+
+    **`rcvFileStart`** — File download has started (fires after `rcvFileDescrReady`).
+
+    Fields:
+    - `user`: [User](/bots/api-types#user)
+    - `chatItem`: [AChatItem](/bots/api-types#achatitem)
+
+    ---
+
+    **`rcvFileComplete`** — File download finished successfully. The file is now at the path in `chatItem.file.fileSource.filePath`.
+
+    Fields:
+    - `user`: [User](/bots/api-types#user)
+    - `chatItem`: [AChatItem](/bots/api-types#achatitem)
+
+    ---
+
+    **`rcvFileSndCancelled`** — The sender cancelled the file transfer before it completed.
+
+    Fields:
+    - `user`: [User](/bots/api-types#user)
+    - `chatItem`: [AChatItem](/bots/api-types#achatitem)
+    - `rcvFileTransfer`: [RcvFileTransfer](/bots/api-types#rcvfiletransfer)
+
+    ---
+
+    **`sndFileCompleteXFTP`** — Outbound file upload completed via XFTP.
+
+    Fields:
+    - `user`: [User](/bots/api-types#user)
+    - `chatItem`: [AChatItem](/bots/api-types#achatitem)
+    - `fileTransferMeta`: [FileTransferMeta](/bots/api-types#filetransfermeta)
+
+    ---
+
+    **`rcvFileError`** — Error receiving a file.
+
+    Fields:
+    - `user`: [User](/bots/api-types#user)
+    - `chatItem_?`: [AChatItem](/bots/api-types#achatitem)
+    - `agentError`: [AgentErrorType](/bots/api-types#agenterrortype)
+    - `rcvFileTransfer`: [RcvFileTransfer](/bots/api-types#rcvfiletransfer)
+
+    ---
+
+    **`rcvFileWarning`** — Non-fatal warning during file reception (e.g. CLI settings do not allow connecting to a particular file server).
+
+    Fields: same as `rcvFileError`
+
+    ---
+
+    **`sndFileError`** — Error sending a file.
+
+    Fields:
+    - `user`: [User](/bots/api-types#user)
+    - `chatItem_?`: [AChatItem](/bots/api-types#achatitem)
+    - `fileTransferMeta`: [FileTransferMeta](/bots/api-types#filetransfermeta)
+    - `errorMessage`: string
+
+    ---
+
+    **`sndFileWarning`** — Non-fatal warning during file sending.
+
+    Fields: same as `sndFileError`
+  </Accordion>
+
+  <Accordion title="Connection Progress Events">
+    Informational events tracking the lifecycle of pending connections. Useful for monitoring or debugging; most bots do not need to act on these.
+
+    **`contactConnecting`** — Contact confirmed connection after a 1-time invitation or when the bot connects to another SimpleX address.
+
+    **`businessLinkConnecting`** — Contact confirmed connection via a business address.
+
+    Fields: `user`, `groupInfo`, `hostMember`, `fromContact`
+
+    **`sentGroupInvitation`** — A group invitation was sent (another user joined via the bot's group link).
+
+    Fields: `user`, `groupInfo`, `contact`, `member`
+
+    **`groupLinkConnecting`** — Bot is connecting to a group via another user's link.
+
+    Fields: `user`, `groupInfo`, `hostMember`
+
+    **`joinedGroupMemberConnecting`** — A new group member has been announced and is connecting to the bot.
+
+    Fields: `user`, `groupInfo`, `hostMember`, `member`
+  </Accordion>
+
+  <Accordion title="Network Events">
+    Events fired when the CLI connects to or disconnects from SMP or XFTP servers.
+
+    **`hostConnected`** — Connected to a messaging or file server.
+
+    Fields:
+    - `protocol`: string — `"smp"` or `"xftp"`
+    - `transportHost`: string — server hostname
+
+    ---
+
+    **`hostDisconnected`** — Disconnected from a messaging or file server.
+
+    Fields:
+    - `protocol`: string
+    - `transportHost`: string
+
+    ---
+
+    **`subscriptionStatus`** — A message queue subscription status changed.
+
+    Fields:
+    - `server`: string
+    - `subscriptionStatus`: [SubscriptionStatus](/bots/api-types#subscriptionstatus) — `active`, `pending`, `removed`, or `noSub`
+    - `connections`: array of string (agent connection IDs)
+  </Accordion>
+
+  <Accordion title="Error Events">
+    Error events are common and do **not** indicate a malfunction. They occur regularly due to network conditions, expired queues, or messages delivered to deleted chats. Log them for debugging but do not treat them as fatal.
+
+    **`chatError`** — A general chat engine error (only used in the WebSockets API).
+
+    Fields:
+    - `chatError`: [ChatError](/bots/api-types#chaterror)
+
+    ---
+
+    **`chatErrors`** — Multiple chat errors in one event.
+
+    Fields:
+    - `chatErrors`: array of [ChatError](/bots/api-types#chaterror)
+
+    ---
+
+    **`messageError`** — A message processing error (e.g. decryption failure, duplicate message).
+
+    Fields:
+    - `user`: [User](/bots/api-types#user)
+    - `severity`: string — `"error"` or `"warning"`
+    - `errorMessage`: string
+  </Accordion>
+
+</AccordionGroup>

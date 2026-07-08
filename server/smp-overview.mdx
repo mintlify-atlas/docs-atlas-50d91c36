@@ -1,0 +1,58 @@
+---
+title: "SMP Server: How SimpleX Relay Servers Work"
+sidebarTitle: "SMP Overview"
+description: "SMP (Simple Messaging Protocol) relay servers pass encrypted messages between SimpleX clients. Learn how they work and why self-hosting matters."
+---
+
+SMP servers are simple, stateless message relay servers that sit between SimpleX clients. They hold encrypted messages only until a recipient picks them up — and then immediately delete them. Crucially, an SMP server never knows who is communicating with whom: it only ever sees opaque queue IDs and ciphertext it cannot read.
+
+## What SMP servers do
+
+- Accept inbound encrypted messages addressed to a queue ID
+- Store those messages temporarily until the recipient retrieves them
+- Delete messages immediately and permanently after delivery
+- Authorize incoming messages using Ed448 keys — without ever identifying the user behind them
+- Optionally expose a `.onion` address so Tor users can connect without touching the clearnet
+
+## What SMP servers do NOT do
+
+- Store user identities, display names, or any profile data
+- Know who is sending to whom — the server only sees anonymous queue IDs, never the real participants
+- Read message content — all payloads are end-to-end encrypted by clients before they reach the server
+- Persist logs of delivered messages — once a message is picked up it is gone
+
+## Pre-configured servers
+
+SimpleX mobile and desktop apps come pre-configured with three relay servers operated by SimpleX Chat Ltd:
+
+- `smp11.simplex.im`
+- `smp12.simplex.im`
+- `smp14.simplex.im`
+
+These servers are used for new contacts by default. You can add your own server alongside them or replace them entirely — existing contacts are not automatically moved, but you can migrate each one individually using the **Change receiving address** option in the contact's information page.
+
+## Why self-host?
+
+<CardGroup cols={2}>
+  <Card title="Full independence" icon="server" href="/server/smp-install">
+    No reliance on simplex.chat infrastructure. Your messages never touch servers you don't control.
+  </Card>
+  <Card title="Private relay" icon="lock" href="/server/smp-install">
+    Only the contacts you invite use your server. You decide who can create messaging queues.
+  </Card>
+  <Card title="Custom retention" icon="sliders" href="/server/smp-configuration">
+    Configure message expiry, storage quotas, and exactly how long undelivered messages are held.
+  </Card>
+  <Card title="Onion address" icon="circle-nodes" href="/server/smp-configuration">
+    Add a `.onion` address so Tor-only users can connect without exposing their IP to your server.
+  </Card>
+</CardGroup>
+
+## Requirements
+
+Before you start, make sure you have the following:
+
+- A VPS or dedicated server running a Linux distribution (Ubuntu is recommended)
+- A domain name pointed at your server with `A` (and optionally `AAAA`) records — for example, `smp.example.com`
+- Ports **443** and **5223** open in your firewall (port 80 is also needed for Let's Encrypt certificate issuance)
+- Basic Linux command-line knowledge

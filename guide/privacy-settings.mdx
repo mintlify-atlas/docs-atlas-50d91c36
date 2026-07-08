@@ -1,0 +1,106 @@
+---
+title: "Privacy and Security Settings in SimpleX Chat"
+sidebarTitle: "Privacy Settings"
+description: "Configure SimpleX's privacy features: database passphrase, Tor via Orbot, transport isolation, security code verification, and screen security."
+---
+
+SimpleX Chat is designed with privacy-first defaults: no user accounts, no phone numbers, and no centrally stored metadata. Beyond those defaults, the app exposes a set of advanced controls that let you tune your security posture to match your specific threat model.
+
+<Tip>
+  For the highest privacy, combine: a custom database passphrase removed from device storage + transport isolation + Tor (via Orbot) + incognito mode for all new contacts.
+</Tip>
+
+## Database passphrase
+
+Your chat database — containing all messages, contacts, and groups — is encrypted at rest on your device.
+
+- **Default behavior:** On first launch, SimpleX generates a random passphrase and stores it securely in **KeyChain** (iOS) or **KeyStore / TPM** (Android). You never need to enter it manually.
+- **Custom passphrase:** You can replace the random passphrase with one of your own in **Settings → Database passphrase & export → Database passphrase**.
+- **Remove from device storage:** After setting a custom passphrase, you can opt to remove it from device storage entirely. With this option enabled, you must **manually enter the passphrase every time** the app starts. This provides the strongest protection: even if your device is seized and the chip is read, the database cannot be decrypted without the passphrase.
+
+<Note>
+  There is no passphrase recovery mechanism. If you forget a manually-set passphrase, your data cannot be recovered. Store it securely, for example in an offline password manager.
+</Note>
+
+## Security code verification
+
+SimpleX connections are already established via links exchanged over independent channels, providing strong protection against MITM attacks. Security code verification adds a second layer by allowing you to confirm that no substitution occurred.
+
+The security code is a **SHA-256 hash of the combined public keys** of both sides of the connection. If both devices show the same code, the channel is authentic.
+
+**To verify a contact's security code:**
+
+<Steps>
+  <Step title="Open the contact's conversation">
+    Navigate to the chat with the contact you want to verify.
+  </Step>
+  <Step title="Open the contact info page">
+    Tap the **contact's name** at the top of the conversation.
+  </Step>
+  <Step title="Tap Security code">
+    Tap **Verify security code** (or **Security code**). A short alphanumeric code and QR code will be displayed.
+  </Step>
+  <Step title="Compare out-of-band">
+    Ask your contact to open the same screen. Compare your codes via a voice call, video call, or in person. Both devices must show **identical** codes.
+  </Step>
+  <Step title="Mark as verified">
+    Once confirmed, tap **Mark as verified** (or scan your contact's QR code with your device). The contact will be marked with a ✓ verified indicator going forward.
+  </Step>
+</Steps>
+
+## Transport isolation (Beta)
+
+By default, SimpleX may share a single TCP connection to a relay server across multiple contacts. Transport isolation assigns a **separate TCP connection** (and, when using Tor, a separate Tor circuit) to each contact, so that relay servers cannot correlate your activity across different conversations.
+
+**To enable transport isolation:**
+
+1. Enable **Developer tools** in **Settings → Developer tools → Show developer options**.
+2. Go to **Settings → Network & servers**.
+3. Enable **Transport isolation**.
+
+<Note>
+  Transport isolation increases the number of open connections and may slightly increase battery and data usage.
+</Note>
+
+## Tor via Orbot
+
+Routing SimpleX traffic through Tor hides your IP address from relay servers and any network observer between you and the server.
+
+<Tabs>
+  <Tab title="Android">
+    1. Install [Orbot](https://guardianproject.info/apps/org.torproject.android/) from the Guardian Project.
+    2. Start Orbot and ensure the SOCKS proxy is running on port **9050** (default).
+    3. In SimpleX: go to **Settings → Network & servers → Use SOCKS proxy** and enable it (default address: `localhost:9050`).
+    4. Optionally set **Use .onion hosts** to **When available** or **Required** to connect to relay servers via their `.onion` addresses for additional anonymity.
+  </Tab>
+  <Tab title="iOS">
+    1. Install [Orbot](https://apps.apple.com/app/orbot/id1609461599) from the App Store.
+    2. Enable Orbot as a **VPN provider** (iOS does not support SOCKS proxies for third-party apps).
+    3. In SimpleX: go to **Settings → Network & servers → Use .onion hosts** and set it to **When available** or **Required**.
+  </Tab>
+</Tabs>
+
+<Note>
+  iOS VPN mode can occasionally leak traffic to the regular network if the VPN app crashes. For a fully managed device, consider enabling always-on VPN at the system level.
+</Note>
+
+## Screen security
+
+SimpleX provides two screen-level protections accessible via **Settings → Privacy & security**:
+
+- **SimpleX Lock** — Requires biometric (fingerprint/face) or PIN authentication each time you open or resume the app after 30 seconds in the background. Enable by toggling **SimpleX Lock** and confirming your device credentials.
+- **Protect app screen** — Hides the app contents in the recent-apps switcher and, on Android, **disables screenshots** system-wide. This is enabled by default.
+
+## SimpleX contact address settings
+
+Your **SimpleX contact address** is a reusable public link others can use to connect with you (unlike one-time invitation links, it can be shared openly).
+
+Configure its behavior in **Settings → Your SimpleX contact address**:
+
+| Setting | Description |
+|---------|-------------|
+| **Auto-accept requests** | Automatically accept all incoming contact requests without manual approval |
+| **Welcome message** | A message sent automatically to every new contact who connects via your address |
+| **Incognito connections** | When enabled, new contacts from your address get a random name instead of your real profile name |
+
+You can **delete your contact address** at any time without affecting existing contacts — the address is not used to deliver messages, only to initiate new connections.

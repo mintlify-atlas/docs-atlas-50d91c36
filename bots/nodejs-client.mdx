@@ -1,0 +1,319 @@
+---
+title: "SimpleX Node.js SDK Reference"
+sidebarTitle: "Node.js Client"
+description: "The simplex-chat Node.js SDK provides high-level bot primitives and a native binding to libsimplex — no separate CLI process required."
+---
+
+The Node.js SDK (`npm install simplex-chat`) uses a native C++ binding to embed `libsimplex` directly in the Node.js process — no separate CLI process needed. The package exposes three layers: a high-level `bot` module for the common bot pattern, a mid-level `api` (`ChatApi` class) for full programmatic control, and a low-level `core` module for direct access to the native `libsimplex` functions. Most bots only need the `bot` or `api` layer.
+
+<Tip>
+  Use `DbConfig` with a fixed `filePrefix` in production so the bot database persists across restarts. Without this, a new identity is created each time the bot starts.
+</Tip>
+
+## Installation
+
+<Steps>
+  <Step title="Install the package">
+    ```sh
+    npm install simplex-chat
+    ```
+
+    On Mac, the first run may take 20–30 seconds while macOS verifies the native library signature.
+  </Step>
+  <Step title="PostgreSQL backend (optional, Linux x86_64 only)">
+    By default the package uses SQLite. To use PostgreSQL instead:
+
+    ```sh
+    npm install simplex-chat --simplex_backend=postgres
+    ```
+
+    Or persist the setting in `.npmrc`:
+
+    ```ini
+    simplex_backend=postgres
+    ```
+
+    Requires `libpq5` on the host: `apt install libpq5`. PostgreSQL is only available for Linux x86_64.
+  </Step>
+</Steps>
+
+---
+
+## bot module (high-level)
+
+The `bot` module provides a single `run` function that handles the full bot lifecycle: user creation, address management, profile synchronisation, and event dispatch. This is the recommended starting point.
+
+### `bot.run(config)`
+
+```typescript
+import {bot} from 'simplex-chat'
+
+const [chat, user, address] = await bot.run({
+  profile: {displayName: 'My Bot', fullName: ''},
+  dbOpts: {type: 'sqlite', filePrefix: './data/my_bot'},
+  options: {
+    addressSettings: {
+      welcomeMessage: 'Hello! Send me a number and I will square it.',
+    },
+  },
+  onMessage: async (ci, content) => {
+    const n = +content.text
+    const reply =
+      typeof n === 'number' && !isNaN(n) ? `${n} * ${n} = ${n * n}` : 'not a number'
+    await chat.apiSendTextReply(ci, reply)
+  },
+})
+```
+
+Returns a tuple `[ChatApi, T.User, T.UserContactLink | undefined]`.
+
+### BotConfig
+
+```typescript
+interface BotConfig {
+  profile: T.Profile
+  dbOpts: BotDbOpts              // DbConfig + optional confirmMigrations
+  options?: BotOptions
+  onMessage?: (chatItem: T.AChatItem, content: T.MsgContent) => void | Promise<void>
+  onCommands?: {
+    [keyword: string]: (chatItem: T.AChatItem, command: BotCommand) => void | Promise<void>
+  }
+  events?: EventSubscribers      // additional ChatApi.on() subscriptions
+}
+```
+
+### BotOptions
+
+```typescript
+interface BotOptions {
+  createAddress?: boolean          // create address if absent (default: true)
+  updateAddress?: boolean          // update address settings if changed (default: true)
+  updateProfile?: boolean          // sync profile on startup (default: true)
+  addressSettings?: BotAddressSettings
+  allowFiles?: boolean             // allow file transfers in bot prefs (default: false)
+  commands?: T.ChatBotCommand[]    // commands shown in the client UI
+  useBotProfile?: boolean          // set peerType=bot and disable calls/voice (default: true)
+  logContacts?: boolean            // log connections/disconnections (default: true)
+  logNetwork?: boolean             // log server connections (default: false)
+}
+```
+
+### BotAddressSettings
+
+```typescript
+interface BotAddressSettings {
+  autoAccept?: boolean                         // auto-accept requests (default: true)
+  welcomeMessage?: T.MsgContent | string       // message sent to new contacts
+  businessAddress?: boolean                    // business chat address (default: false)
+}
+```
+
+---
+
+## DbConfig
+
+`DbConfig` is a discriminated union — pick the variant that matches the backend you installed:
+
+```typescript
+type DbConfig =
+  | {
+      type: 'sqlite'
+      filePrefix: string       // creates <prefix>_chat.db and <prefix>_agent.db
+      encryptionKey?: string   // optional SQLCipher key
+    }
+  | {
+      type: 'postgres'
+      connectionString: string  // e.g. 'postgres://user:pass@host/db'
+      schemaPrefix?: string     // namespace prefix; defaults to 'simplex_v1'
+    }
+```
+
+---
+
+## ChatApi class (mid-level)
+
+`ChatApi` (from `simplex-chat/api`) gives direct access to all chat commands without going through the `bot.run` wrapper. Use it when you need more control over lifecycle, event subscriptions, or multi-user scenarios.
+
+### Initialisation
+
+```typescript
+import * as api from 'simplex-chat/api'
+
+const bot = await api.ChatApi.init(
+  {type: 'sqlite', filePrefix: './data/bot'},
+  api.MigrationConfirmation.YesUp  // optional; default is YesUp
+)
+await bot.startChat()
+```
+
+`ChatApi.init` runs database migrations and returns a ready instance. `startChat()` must be called before sending commands or receiving events.
+
+### Event subscriptions
+
+```typescript
+// Subscribe to a single event type
+bot.on('contactConnected', ({contact}) => {
+  console.log(`${contact.profile.displayName} connected`)
+})
+
+// Subscribe to multiple events at once
+bot.on({
+  contactConnected: ({contact}) => console.log(`${contact.profile.displayName} connected`),
+  contactDeletedByContact: ({contact}) => console.log(`${contact.profile.displayName} left`),
+})
+
+// Subscribe to any event
+bot.onAny((event) => console.log('event:', event.type))
+
+// One-shot subscription
+bot.once('userJoinedGroup', ({groupInfo}) => {
+  console.log('Joined group:', groupInfo.groupProfile.displayName)
+})
+
+// Wait for an event (with optional predicate and timeout)
+const evt = await bot.wait('contactConnected')
+const evtOrUndefined = await bot.wait('contactConnected', undefined, 5000) // 5s timeout
+
+// Unsubscribe
+bot.off('contactConnected', myHandler)  // unsubscribe specific handler
+bot.off('contactConnected')             // unsubscribe all handlers for event
+```
+
+### Selected API methods
+
+The following is a representative selection of the methods available on `ChatApi`. The full list mirrors the TypeScript client methods (see the [TypeScript Client reference](/bots/typescript-client)):
+
+```typescript
+// User management
+await bot.apiGetActiveUser(): Promise<T.User | undefined>
+await bot.apiCreateActiveUser(profile?: T.Profile): Promise<T.User>
+await bot.apiUpdateProfile(userId, profile): Promise<T.UserProfileUpdateSummary | undefined>
+await bot.apiListUsers(): Promise<T.UserInfo[]>
+
+// Address management
+await bot.apiCreateUserAddress(userId): Promise<T.CreatedConnLink>
+await bot.apiGetUserAddress(userId): Promise<T.UserContactLink | undefined>
+await bot.apiDeleteUserAddress(userId): Promise<void>
+await bot.apiSetAddressSettings(userId, settings): Promise<void>
+
+// Messaging
+await bot.apiSendTextMessage(chat, text, inReplyTo?): Promise<T.AChatItem[]>
+await bot.apiSendTextReply(chatItem, text): Promise<T.AChatItem[]>
+await bot.apiSendMessages(chat, messages): Promise<T.AChatItem[]>
+await bot.apiUpdateChatItem(chatType, chatId, chatItemId, msgContent): Promise<T.ChatItem>
+await bot.apiDeleteChatItems(chatType, chatId, chatItemIds, deleteMode): Promise<T.ChatItemDeletion[]>
+
+// Contact management
+await bot.apiListContacts(userId): Promise<T.Contact[]>
+await bot.apiAcceptContactRequest(contactReqId): Promise<T.Contact>
+await bot.apiRejectContactRequest(contactReqId): Promise<void>
+await bot.apiDeleteChat(chatType, chatId, deleteMode?): Promise<void>
+
+// Group management
+await bot.apiNewGroup(userId, groupProfile): Promise<T.GroupInfo>
+await bot.apiAddMember(groupId, contactId, memberRole): Promise<T.GroupMember>
+await bot.apiJoinGroup(groupId): Promise<T.GroupInfo>
+await bot.apiLeaveGroup(groupId): Promise<T.GroupInfo>
+await bot.apiListMembers(groupId): Promise<T.GroupMember[]>
+await bot.apiRemoveMembers(groupId, memberIds, withMessages?): Promise<T.GroupMember[]>
+await bot.apiCreateGroupLink(groupId, memberRole): Promise<string>
+await bot.apiGetGroupLink(groupId): Promise<T.GroupLink>
+
+// Files
+await bot.apiReceiveFile(fileId): Promise<T.AChatItem>
+await bot.apiCancelFile(fileId): Promise<void>
+```
+
+`apiSendTextMessage` and `apiSendMessages` accept `chat` as `[T.ChatType, number]`, `T.ChatRef`, or `T.ChatInfo` for maximum flexibility.
+
+### Lifecycle
+
+```typescript
+await bot.startChat()   // start the event loop and connect
+await bot.stopChat()    // stop the event loop
+await bot.close()       // close the database (call after stopChat)
+```
+
+`started` and `initialized` getters reflect the current state.
+
+---
+
+## Low-level client (`simplex-chat/client`)
+
+The `ChatClient` class from `simplex-chat/client` provides the same WebSocket-based transport interface as the standalone TypeScript package. When used inside the Node.js SDK it communicates with the embedded `libsimplex` via a local WebSocket. Refer to the [TypeScript Client reference](/bots/typescript-client) for the full method list.
+
+```typescript
+import {ChatClient} from 'simplex-chat/client'
+
+const chat = await ChatClient.create() // connects to local libsimplex
+
+const user = await chat.apiGetActiveUser()
+console.log('Active user:', user?.profile.displayName)
+
+for await (const event of chat.msgQ) {
+  console.log('Event:', event.type)
+}
+```
+
+---
+
+## util module
+
+The `util` module exports helper functions for working with chat events and types:
+
+```typescript
+import * as util from 'simplex-chat/util'
+
+// Get the text content of a chat item
+const text = util.ciContentText(chatItem.content)
+
+// Parse a bot command from a chat item (returns {keyword, args} or null)
+const cmd = util.ciBotCommand(chatItem)
+
+// Get a contact address string (prefers short link)
+const link = util.contactAddressStr(userContactLink.connLinkContact)
+
+// Get address settings from a UserContactLink
+const settings = util.botAddressSettings(userContactLink)
+
+// Convert LocalProfile to Profile
+const profile = util.fromLocalProfile(user.profile)
+```
+
+---
+
+## Examples
+
+The package ships runnable examples in `node_modules/simplex-chat/examples/`. Run the squaring bot with:
+
+```sh
+node ./node_modules/simplex-chat/examples/squaring-bot-readme.js
+```
+
+The bot creates its database in the current directory on first run and logs its contact address. Paste the address into a SimpleX client to connect. A more complete `squaring-bot.ts` example (using TypeScript and `onCommands`) is also included.
+
+---
+
+## Testing
+
+The package includes Jest integration tests that run against the embedded native library:
+
+```sh
+cd ./packages/simplex-chat-nodejs
+npm install
+npm run build
+npm test
+```
+
+---
+
+## Module overview
+
+| Module | Import path | Purpose |
+|---|---|---|
+| `bot` | `simplex-chat` | High-level one-call bot runner (`bot.run`) |
+| `api` | `simplex-chat/api` | `ChatApi` class — full programmatic control |
+| `core` | `simplex-chat/core` | Low-level FFI to `libsimplex` |
+| `util` | `simplex-chat/util` | Helper functions for events and types |
+
+All modules re-export `@simplex-chat/types` (`CC`, `CR`, `CEvt`, `T`) so you only need one import for types when using the Node.js SDK.

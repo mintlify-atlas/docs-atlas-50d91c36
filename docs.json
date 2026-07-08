@@ -1,72 +1,118 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "theme": "mint",
-  "name": "Mintlify Starter Kit",
+  "name": "SimpleX Chat",
+  "theme": "luma",
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
+    "primary": "#18c0f3",
+    "light": "#073786",
+    "dark": "#f1f9f9"
   },
-  "favicon": "/favicon.svg",
-  "navigation": {
-    "pages": [
-      {
-        "group": "Getting Started",
-        "pages": [
-          "index",
-          "quickstart"
-        ]
-      }
-    ],
-    "global": {
-      "anchors": [
-        {
-          "anchor": "Documentation",
-          "href": "https://mintlify.com/docs",
-          "icon": "book-open-cover"
-        },
-        {
-          "anchor": "Blog",
-          "href": "https://mintlify.com/blog",
-          "icon": "newspaper"
-        }
-      ]
-    }
-  },
+  "favicon": "https://media.brand.dev/a00dde8b-b980-42a4-84db-42c4dcfe5f5e.jpg",
   "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
+    "light": "https://media.brand.dev/d5ae8e69-f296-48a5-aa0f-7c4a62a001c5.png",
+    "dark": "https://media.brand.dev/d5ae8e69-f296-48a5-aa0f-7c4a62a001c5.png"
   },
   "navbar": {
-    "links": [
-      {
-        "label": "Support",
-        "href": "mailto:hi@mintlify.com"
-      }
-    ],
     "primary": {
-      "type": "button",
-      "label": "Dashboard",
-      "href": "https://app.mintlify.com"
+      "type": "github",
+      "href": "https://github.com/simplex-chat/simplex-chat"
     }
-  },
-  "contextual": {
-    "options": [
-      "copy",
-      "view",
-      "chatgpt",
-      "claude",
-      "perplexity",
-      "mcp",
-      "cursor",
-      "vscode"
-    ]
   },
   "footer": {
     "socials": {
-      "x": "https://x.com/mintlify",
-      "github": "https://github.com/mintlify",
-      "linkedin": "https://linkedin.com/company/mintlify"
+      "github": "https://github.com/simplex-chat/simplex-chat"
     }
+  },
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Overview",
+        "groups": [
+          {
+            "group": "Introduction",
+            "pages": [
+              "introduction",
+              "why-simplex",
+              "security-and-privacy"
+            ]
+          },
+          {
+            "group": "Getting Started",
+            "pages": [
+              "getting-started/install-mobile",
+              "getting-started/install-cli",
+              "getting-started/making-connections"
+            ]
+          },
+          {
+            "group": "User Guide",
+            "pages": [
+              "guide/send-messages",
+              "guide/groups",
+              "guide/file-transfer",
+              "guide/calls",
+              "guide/chat-profiles",
+              "guide/privacy-settings"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Self-Hosting",
+        "groups": [
+          {
+            "group": "SMP Server",
+            "pages": [
+              "server/smp-overview",
+              "server/smp-install",
+              "server/smp-configuration"
+            ]
+          },
+          {
+            "group": "XFTP Server",
+            "pages": [
+              "server/xftp-overview",
+              "server/xftp-install"
+            ]
+          },
+          {
+            "group": "Advanced",
+            "pages": [
+              "server/tor-setup",
+              "server/webrtc-turn"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Bot Development",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": [
+              "bots/overview",
+              "bots/quickstart-nodejs",
+              "bots/quickstart-python"
+            ]
+          },
+          {
+            "group": "API Reference",
+            "pages": [
+              "bots/api-commands",
+              "bots/api-events",
+              "bots/api-types"
+            ]
+          },
+          {
+            "group": "Client Libraries",
+            "pages": [
+              "bots/typescript-client",
+              "bots/python-client",
+              "bots/nodejs-client"
+            ]
+          }
+        ]
+      }
+    ]
   }
 }

@@ -1,0 +1,307 @@
+---
+title: "SimpleX Python SDK Reference"
+sidebarTitle: "Python Client"
+description: "The simplex-chat Python SDK (PyPI) provides a decorator-based bot API with automatic library management, typed event handling, and async message dispatch."
+---
+
+The Python SDK (`pip install simplex-chat`) bundles the `libsimplex` native library and exposes a decorator-based API for building bots. The top-level `Bot` class (which extends the lower-level `Client`) handles identity creation, contact address management, auto-accept, welcome messages, and profile synchronisation automatically. Handlers are registered with `@bot.on_message`, `@bot.on_command`, and `@bot.on_event` decorators. Handler dispatch is first-match-wins in registration order — the same model as the Node.js SDK.
+
+<Note>
+  Handler matching is first-match-wins. Always put specific handlers (e.g. exact command matchers or typed `content_type` filters) before generic catch-all handlers to ensure the right handler fires.
+</Note>
+
+## Installation
+
+<Steps>
+  <Step title="Install the package">
+    ```sh
+    pip install simplex-chat
+    ```
+  </Step>
+  <Step title="Pre-fetch the native library">
+    The native `libsimplex` is downloaded lazily on first use. Pre-fetch it explicitly to avoid a delay on first run:
+    ```sh
+    python -m simplex_chat install
+    ```
+  </Step>
+  <Step title="PostgreSQL backend (optional, Linux x86_64 only)">
+    By default SQLite is used. To target PostgreSQL:
+    ```sh
+    python -m simplex_chat install --backend postgres
+    ```
+    Requires `libpq5` on the host: `apt install libpq5`.
+  </Step>
+</Steps>
+
+## Bot class
+
+`Bot` is the main class for building bots. It extends `Client` with server-side features: a long-term contact address, auto-accept, a welcome message, and bot profile preferences (`peerType=bot`, disabled calls/voice).
+
+### Constructor
+
+```python
+Bot(
+    *,
+    profile: Profile,
+    db: Db,
+    welcome: str | MsgContent | None = None,
+    commands: list[BotCommand] | None = None,
+    confirm_migrations: MigrationConfirmation = MigrationConfirmation.YES_UP,
+    create_address: bool = True,
+    update_address: bool = True,
+    update_profile: bool = True,
+    auto_accept: bool = True,
+    business_address: bool = False,
+    allow_files: bool = False,
+    log_contacts: bool = True,
+    log_network: bool = False,
+)
+```
+
+| Parameter | Type | Description |
+|---|---|---|
+| `profile` | `Profile` | Bot display name and optional full name. |
+| `db` | `SqliteDb \| PostgresDb` | Database configuration (see [Database configuration](#database-configuration)). |
+| `welcome` | `str \| MsgContent \| None` | Welcome message sent automatically to new contacts via the auto-reply address setting. |
+| `commands` | `list[BotCommand] \| None` | Slash-commands advertised in the bot's profile UI. |
+| `auto_accept` | `bool` | Whether to automatically accept incoming contact requests (default `True`). |
+| `allow_files` | `bool` | Whether to allow file transfers in the bot's preferences (default `False`). |
+| `log_contacts` | `bool` | Log contact-connected and contact-deleted events to the console (default `True`). |
+
+### Lifecycle
+
+```python
+bot.run()
+```
+
+Blocks the current thread; runs the event loop with SIGINT/SIGTERM handlers installed. Logs the bot address on startup. Press `Ctrl+C` once for a graceful stop.
+
+```python
+async with bot:
+    await bot.serve_forever()
+```
+
+Async context manager alternative — use this when you need to compose the bot with other async tasks.
+
+```python
+async for event in bot.events():
+    print(event["type"])
+```
+
+Yields each raw `ChatEvent` dict after running all registered handlers. Mutually exclusive with `serve_forever`.
+
+### `connect_to` and `send_and_wait`
+
+```python
+await bot.connect_to(link: str, *, timeout: float = 120.0) -> T.Contact
+```
+
+Connect to a contact link and wait for the `contactConnected` event. Idempotent: returns the existing `Contact` if the link is already known. Requires the receive loop to be running.
+
+```python
+await bot.send_and_wait(contact_id: int, text: str, *, timeout: float = 30.0) -> Message
+```
+
+Send a text message and wait for the next reply from that contact. The awaiting caller "owns" the reply — registered `@on_message` handlers do not fire for it.
+
+---
+
+## Decorators
+
+### `@bot.on_message`
+
+```python
+@bot.on_message(content_type=None, text=None)
+async def handler(msg: Message) -> None:
+    ...
+```
+
+Registers a message handler. All keyword arguments are filters; omit them for a catch-all.
+
+| Filter | Type | Description |
+|---|---|---|
+| `content_type` | `str` | Matches messages whose `MsgContent` type equals this string (e.g. `"text"`, `"image"`, `"file"`). When `"text"` is given, the handler receives a `TextMessage`; similarly for other content types. |
+| `text` | `str \| re.Pattern` | Matches only messages whose text satisfies the pattern. A plain string is matched literally; a compiled `re.Pattern` is matched with `re.search`. |
+
+### `@bot.on_command`
+
+```python
+@bot.on_command('help')
+async def handler(msg: Message, cmd: ParsedCommand) -> None:
+    await msg.reply(f'You asked for {cmd.keyword} with args: {cmd.args}')
+```
+
+Registers a handler for messages whose text starts with `/<name>`. `name` can also be a tuple of strings to match multiple keywords with one handler. The `ParsedCommand` argument exposes `keyword` and `args` (the remainder of the message after the keyword).
+
+### `@bot.on_event`
+
+```python
+@bot.on_event('contactConnected')
+async def handler(event: CEvt.ContactConnected) -> None:
+    print(f"{event['contact']['profile']['displayName']} connected")
+```
+
+Registers a handler for any `ChatEvent` with the given `type` tag. The event parameter is narrowed to the concrete event type when the tag is a known `CEvt.Tag` literal.
+
+---
+
+## Handler signature
+
+All handlers are **async functions**.
+
+**Message handlers** (`@on_message`) receive a single `Message` object:
+
+```python
+@bot.on_message(content_type='text')
+async def handle(msg: TextMessage) -> None:
+    text = msg.text                       # str | None
+    chat_info = msg.chat_info             # T.ChatInfo
+    await msg.reply('Got your message!')  # sends a text reply
+    await msg.reply_content({'type': 'text', 'text': 'raw content'})
+```
+
+**Command handlers** (`@on_command`) receive `(msg, cmd)`:
+
+```python
+@bot.on_command('help')
+async def handle(msg: Message, cmd: ParsedCommand) -> None:
+    # cmd.keyword == 'help'
+    # cmd.args    == '' or the text after '/help '
+    await msg.reply(f'Help requested with args: {cmd.args}')
+```
+
+**Event handlers** (`@on_event`) receive the raw event dict:
+
+```python
+@bot.on_event('newChatItems')
+async def handle(event: CEvt.NewChatItems) -> None:
+    for ci in event['chatItems']:
+        print(ci['chatItem']['content']['type'])
+```
+
+---
+
+## Profile
+
+```python
+from simplex_chat import Profile
+
+profile = Profile(
+    display_name='My Bot',
+    full_name='My Bot Service',   # optional
+    short_descr='What this bot does',  # optional
+    image=None,                   # optional base64 image string
+)
+```
+
+`BotProfile` is an alias for `Profile` for backward compatibility.
+
+---
+
+## Database configuration
+
+```python
+from simplex_chat import Bot, SqliteDb, PostgresDb
+
+# SQLite (default) — two files are created:
+#   ./data/bot_chat.db and ./data/bot_agent.db
+bot = Bot(
+    profile=Profile(display_name='My Bot'),
+    db=SqliteDb(file_prefix='./data/bot'),
+)
+
+# SQLite with SQLCipher encryption
+bot = Bot(
+    profile=Profile(display_name='My Bot'),
+    db=SqliteDb(file_prefix='./data/bot', encryption_key='s3cr3t'),
+)
+
+# PostgreSQL (Linux x86_64 only, requires libpq5 and postgres backend)
+bot = Bot(
+    profile=Profile(display_name='My Bot'),
+    db=PostgresDb(
+        connection_string='postgresql://user:pass@localhost/botdb',
+        schema_prefix='bot_',  # optional, defaults to "simplex_v1"
+    ),
+)
+```
+
+---
+
+## Full example: FAQ bot
+
+```python faq-bot.py
+import re
+from simplex_chat import Bot, Profile, SqliteDb, TextMessage, Message
+
+bot = Bot(
+    profile=Profile(display_name='FAQ Bot', full_name='FAQ Assistant'),
+    db=SqliteDb(file_prefix='./faq_bot'),
+    welcome='Ask me anything! Try /help for a list of topics.',
+)
+
+FAQ = {
+    'hours':   'We are available 9 am–5 pm UTC, Monday through Friday.',
+    'pricing': 'See our pricing page at https://example.com/pricing',
+    'support': 'Email support@example.com for urgent issues.',
+}
+
+@bot.on_command('help')
+async def handle_help(msg: Message, cmd) -> None:
+    topics = ', '.join(FAQ.keys())
+    await msg.reply(f'Available topics: {topics}. Ask with /topic')
+
+@bot.on_command(tuple(FAQ.keys()))
+async def handle_topic(msg: Message, cmd) -> None:
+    await msg.reply(FAQ[cmd.keyword])
+
+@bot.on_message(content_type='text', text=re.compile(r'^/'))
+async def handle_unknown_command(msg: TextMessage) -> None:
+    await msg.reply('Unknown command. Try /help')
+
+@bot.on_message()
+async def catch_all(msg: Message) -> None:
+    await msg.reply('Send /help for a list of available commands.')
+
+if __name__ == '__main__':
+    bot.run()
+```
+
+---
+
+## Middleware
+
+Use `bot.use(middleware)` to wrap all message handlers with cross-cutting logic such as logging, error reporting, or rate limiting:
+
+```python
+from simplex_chat import Bot, Middleware, Message
+from typing import Callable, Awaitable
+
+class LoggingMiddleware(Middleware):
+    async def __call__(self, handler, message: Message, data: dict) -> None:
+        print(f'Incoming: {message.text!r}')
+        await handler(message, data)
+        print('Handler done')
+
+bot.use(LoggingMiddleware())
+```
+
+---
+
+## Wire types
+
+`simplex_chat.types` contains auto-generated type definitions that mirror the Haskell source types exactly. They are structured as `TypedDict` subclasses (for dict-like access) and discriminated unions:
+
+- `simplex_chat.types.T` — all core data types (`T.User`, `T.Contact`, `T.GroupInfo`, `T.AChatItem`, `T.MsgContent`, etc.)
+- `simplex_chat.types.CEvt` — all event types (`CEvt.ChatEvent`, `CEvt.ContactConnected`, `CEvt.NewChatItems`, etc.)
+- `simplex_chat.types.CR` — all response types
+- `simplex_chat.types.CC` — command string builders
+
+Access event fields as dict keys (the types are `TypedDict`):
+
+```python
+@bot.on_event('contactConnected')
+async def on_connected(event) -> None:
+    name = event['contact']['profile']['displayName']
+    print(f'{name} connected')
+```

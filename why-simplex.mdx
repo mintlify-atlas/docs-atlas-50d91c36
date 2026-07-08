@@ -1,0 +1,65 @@
+---
+title: "Why SimpleX: The Case for Identifier-Free Messaging"
+sidebarTitle: "Why SimpleX"
+description: "Most messaging apps protect message content but leak metadata about who you talk to and when. SimpleX eliminates user identifiers entirely to protect both."
+---
+
+Most encrypted messaging apps do an excellent job protecting the *content* of your messages — but they all leave a significant amount of metadata exposed. Every platform that assigns an identity to its users — a phone number, a username, a public key, or even a random identifier — can reveal your social graph: who you talk to, how often, and when. This information is visible to the platform's servers, and potentially to anyone who can observe or subpoena them. The conversation about privacy has focused too long on message content; the metadata often tells a more complete story.
+
+SimpleX was built from the ground up to protect both. By eliminating user identifiers entirely, SimpleX ensures that its servers have no way to know who is communicating with whom — and neither does anyone observing the network.
+
+## The problem with existing platforms
+
+### Phone-number-based identity (Signal, WhatsApp)
+
+Signal and WhatsApp use phone numbers to identify users and their contacts. While the *content* of messages on Signal is protected with robust end-to-end encryption, there is a significant amount of metadata visible to Signal's servers — including who you talk to and when. Your phone number is a persistent, real-world identity that directly links your digital communications to your legal identity.
+
+### Username or public-key identity (XMPP, Matrix)
+
+XMPP and Matrix do not require a real name, but they do require a persistent identity — typically a DNS-based address such as `user@server.org`. Even an anonymous username creates a stable identifier that can be used to map a user's communication graph over time. Any observer who can see messages flowing through the network can correlate activity to that identifier. Servers in federated networks also maintain records of user accounts and, in many cases, communicate message routing metadata between servers.
+
+### P2P protocols that still need global identifiers (DHT)
+
+Peer-to-peer networks such as those using Distributed Hash Tables (DHT) typically require a globally unique identifier — often a public key or derived address — to route messages through the network. While these identifiers may be pseudonymous, they are persistent and globally visible. This means anyone observing the DHT can build a map of who is talking to whom. P2P networks are also vulnerable to Sybil attacks (where an attacker floods the network with malicious nodes), DRDoS amplification attacks, and are more easily blocked by ISPs.
+
+### The social graph problem
+
+In every model above, a single persistent identifier per user means that two different people who communicate with the same user can confirm they share a contact — they will see the same identifier in the messages. This makes de-anonymization possible even when no real name is used. The social graph itself becomes a liability.
+
+## SimpleX's approach
+
+SimpleX replaces user identifiers with **unidirectional simplex message queues**. Instead of having one address that represents "you," each connection between two people uses a dedicated pair of one-way queues — one for each direction of communication. These queue addresses are pairwise and per-connection: your queue address with one contact shares nothing with your queue address with any other contact.
+
+Establishing a connection works through **one-time invitation links** rather than persistent addresses. You generate a link, share it with the person you want to connect to (the channel does not need to be secure — only confirmed), and once the connection is established the link cannot be reused. Because there is no persistent "you" on the network, no server ever holds a record of all your contacts in one place, and there is no identifier that could be used to correlate your conversations.
+
+As the SimpleX platform explains it: using SimpleX is like having a different phone number for every contact you have — but without the hassle of managing all those numbers, and without any of them being tied to your real identity.
+
+## Comparison with other protocols
+
+The table below summarises how SimpleX compares to other major messaging approaches across the dimensions that matter most for privacy and resilience.
+
+| Feature | SimpleX | Signal / Big Platforms | XMPP / Matrix | P2P Protocols |
+|---|---|---|---|---|
+| Requires user identifiers | **No — private** | Yes ¹ | Yes ² | Yes ³ |
+| Possibility of MITM attack | **No — secure** | Yes ⁴ | Yes | Yes |
+| Dependence on DNS | **No — resilient** | Yes | Yes | No |
+| Single operator or network | **No — decentralized** | Yes | No | Yes ⁵ |
+| Central component or network-wide attack surface | **No — resilient** | Yes | Yes ² | Yes ⁶ |
+
+¹ Usually based on a phone number; in some cases on usernames.  
+² DNS-based; federated servers maintain user account records and communicate with each other.  
+³ Public key or some other globally unique ID required for DHT routing.  
+⁴ If the operator's servers are compromised, a MITM is possible.  
+⁵ P2P networks operate as a single network with a single namespace of user addresses — distributed, but not truly decentralized.  
+⁶ P2P networks either have a central authority or the whole network can be compromised via Sybil attacks or DHT poisoning.
+
+## What you gain
+
+- **Privacy of identity** — there is no persistent identifier for you on the network. SimpleX's own servers do not know how many people use the platform, let alone who they communicate with.
+- **Protection against spam and abuse** — because you have no identifier, you cannot be contacted unless you actively share a one-time invitation link or an optional temporary address. Unsolicited contact is structurally impossible without your explicit action.
+- **Data ownership** — all messages and contacts are stored only on your device. SimpleX relay servers hold messages temporarily until they are received, then discard them. There are no user accounts on any server.
+- **Network resilience** — SimpleX's server network is fragmented and non-enumerable. Servers do not know about each other, do not communicate with each other, and cannot be listed. If some servers are compromised or taken offline, the rest of the network continues to function normally and affected users can switch servers without losing any contacts or message history.
+
+<Tip>
+SimpleX contact addresses are entirely optional and temporary. They can be used to let multiple people find and connect to you — similar to sharing a public profile link — but they are separate from your actual connections. If you delete or change your SimpleX address, **none of your existing conversations are affected**. Your ongoing connections use dedicated per-contact message queues that are independent of any address you may have published.
+</Tip>

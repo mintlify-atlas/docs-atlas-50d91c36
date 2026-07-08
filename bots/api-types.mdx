@@ -1,0 +1,465 @@
+---
+title: "SimpleX Bot API: Core Data Types Reference"
+sidebarTitle: "Types"
+description: "Core data types used in SimpleX bot API commands and events — User, Contact, Group, ChatItem, Profile, and message content types."
+---
+
+These types appear as JSON in API command responses and event payloads. All types form discriminated unions (tagged by a `type` field) or plain record objects. The type hierarchy mirrors the Haskell source — TypeScript definitions live in `@simplex-chat/types` and Python definitions in `simplex_chat.types`.
+
+<Note>
+TypeScript type definitions are in the `@simplex-chat/types` package (`packages/simplex-chat-client/types/typescript/src/`). Python types in `simplex_chat.types` are auto-generated from the same Haskell source. Field names and union discriminants are identical across both languages and match what the WebSocket API sends.
+</Note>
+
+---
+
+## User
+
+The `User` object is included in most command responses and events. The `userId` is the key identifier used in command prefixes like `/_address <userId>`.
+
+<Expandable title="User fields">
+  <ResponseField name="userId" type="integer" required>
+    Numeric user ID. Used as a parameter in most API commands, e.g. `/_address 1`.
+  </ResponseField>
+  <ResponseField name="agentUserId" type="integer" required>
+    Internal agent user identifier (different from `userId`).
+  </ResponseField>
+  <ResponseField name="userContactId" type="integer" required>
+    ID of the user's own contact record.
+  </ResponseField>
+  <ResponseField name="localDisplayName" type="string" required>
+    Display name as stored locally. Not shared with contacts (contacts see `profile.displayName`).
+  </ResponseField>
+  <ResponseField name="profile" type="LocalProfile" required>
+    The user's profile as shared with contacts. See [LocalProfile](#localprofile).
+  </ResponseField>
+  <ResponseField name="fullPreferences" type="FullPreferences" required>
+    The user's full chat feature preferences (timed messages, full delete, reactions, etc.).
+  </ResponseField>
+  <ResponseField name="activeUser" type="boolean" required>
+    Whether this is the currently active user profile in the CLI.
+  </ResponseField>
+  <ResponseField name="showNtfs" type="boolean" required>
+    Whether notifications are enabled for this user.
+  </ResponseField>
+  <ResponseField name="sendRcptsContacts" type="boolean" required>
+    Send read receipts to direct contacts.
+  </ResponseField>
+  <ResponseField name="sendRcptsSmallGroups" type="boolean" required>
+    Send read receipts in small groups.
+  </ResponseField>
+</Expandable>
+
+---
+
+## Profile
+
+`Profile` is the user profile shared with contacts over the network. `LocalProfile` extends this with local-only fields like `localAlias`.
+
+<Expandable title="Profile fields">
+  <ResponseField name="displayName" type="string" required>
+    Display name shown to all contacts. Must be a valid SimpleX display name (no spaces; use `fullName` for a longer name).
+  </ResponseField>
+  <ResponseField name="fullName" type="string" required>
+    Full name shown alongside the display name. Can be an empty string.
+  </ResponseField>
+  <ResponseField name="shortDescr" type="string">
+    Short description or bio (optional).
+  </ResponseField>
+  <ResponseField name="image" type="string">
+    Base64-encoded avatar image (optional).
+  </ResponseField>
+  <ResponseField name="contactLink" type="string">
+    The user's SimpleX contact address, if included in the profile (optional).
+  </ResponseField>
+  <ResponseField name="preferences" type="Preferences">
+    Chat feature preferences propagated to contacts (optional).
+  </ResponseField>
+  <ResponseField name="peerType" type='"human" | "bot"'>
+    Set to `"bot"` to signal that this profile belongs to a bot. Supported from v6.4.3. App UI renders bot profiles distinctly and shows command menus.
+  </ResponseField>
+</Expandable>
+
+---
+
+## LocalProfile
+
+`LocalProfile` is `Profile` plus local fields that are not sent over the network.
+
+<Expandable title="LocalProfile fields">
+  <ResponseField name="profileId" type="integer" required>
+    Internal profile record ID.
+  </ResponseField>
+  <ResponseField name="displayName" type="string" required>
+    Same as in Profile.
+  </ResponseField>
+  <ResponseField name="fullName" type="string" required>
+    Same as in Profile.
+  </ResponseField>
+  <ResponseField name="image" type="string">
+    Base64-encoded avatar (optional).
+  </ResponseField>
+  <ResponseField name="contactLink" type="string">
+    Optional SimpleX address embedded in profile.
+  </ResponseField>
+  <ResponseField name="preferences" type="Preferences">
+    Chat feature preferences (optional).
+  </ResponseField>
+  <ResponseField name="peerType" type='"human" | "bot"'>
+    Peer type — `"bot"` marks this as a bot profile.
+  </ResponseField>
+  <ResponseField name="localAlias" type="string" required>
+    Local alias assigned to this profile (not shared). Empty string if not set.
+  </ResponseField>
+</Expandable>
+
+---
+
+## Contact
+
+Represents a contact in a direct conversation.
+
+<Expandable title="Contact fields">
+  <ResponseField name="contactId" type="integer" required>
+    Numeric contact ID. Used in direct message command prefixes: `@<contactId>`.
+  </ResponseField>
+  <ResponseField name="localDisplayName" type="string" required>
+    Locally stored display name for the contact.
+  </ResponseField>
+  <ResponseField name="profile" type="LocalProfile" required>
+    The contact's profile as received from the network.
+  </ResponseField>
+  <ResponseField name="activeConn" type="Connection">
+    The active connection details (optional — absent for contacts with no current connection).
+  </ResponseField>
+  <ResponseField name="contactUsed" type="boolean" required>
+    Whether any messages have been exchanged with this contact.
+  </ResponseField>
+  <ResponseField name="contactStatus" type='"active" | "deleted" | "deletedByUser"' required>
+    Current status of the contact relationship.
+  </ResponseField>
+  <ResponseField name="chatSettings" type="ChatSettings" required>
+    Per-contact chat settings (notifications, read receipts, favourited).
+  </ResponseField>
+  <ResponseField name="userIsIncognito" type="boolean">
+    Whether the bot connected to this contact using an incognito profile.
+  </ResponseField>
+  <ResponseField name="chatItemTTL" type="integer">
+    Timed message TTL for this contact (seconds, optional).
+  </ResponseField>
+  <ResponseField name="customData" type="object">
+    Bot-defined JSON data stored locally. Set with `APISetContactCustomData`. Not shared with the contact.
+  </ResponseField>
+</Expandable>
+
+---
+
+## GroupInfo
+
+Represents a group chat.
+
+<Expandable title="GroupInfo fields">
+  <ResponseField name="groupId" type="integer" required>
+    Numeric group ID. Used in group command prefixes: `#<groupId>`.
+  </ResponseField>
+  <ResponseField name="localDisplayName" type="string" required>
+    Locally stored group name.
+  </ResponseField>
+  <ResponseField name="groupProfile" type="GroupProfile" required>
+    The group's shared profile (display name, full name, description, image, preferences).
+  </ResponseField>
+  <ResponseField name="membership" type="GroupMember" required>
+    The bot's own membership record in this group (includes the bot's role).
+  </ResponseField>
+  <ResponseField name="fullGroupPreferences" type="FullGroupPreferences" required>
+    Resolved group feature preferences.
+  </ResponseField>
+  <ResponseField name="businessChat" type="BusinessChatInfo">
+    Present if this group is a business address chat. Contains `chatType` (`"business"` or `"customer"`) and participant IDs.
+  </ResponseField>
+  <ResponseField name="customData" type="object">
+    Bot-defined JSON data stored locally.
+  </ResponseField>
+</Expandable>
+
+---
+
+## GroupMember
+
+Represents a member of a group.
+
+<Expandable title="GroupMember fields">
+  <ResponseField name="groupMemberId" type="integer" required>
+    Numeric group member ID. Used in moderation command parameters.
+  </ResponseField>
+  <ResponseField name="groupId" type="integer" required>
+    The group this member belongs to.
+  </ResponseField>
+  <ResponseField name="memberId" type="string" required>
+    Opaque member identifier (used in protocol, not in commands).
+  </ResponseField>
+  <ResponseField name="memberRole" type="GroupMemberRole" required>
+    Current role: `"relay"` | `"observer"` | `"author"` | `"member"` | `"moderator"` | `"admin"` | `"owner"`.
+  </ResponseField>
+  <ResponseField name="memberStatus" type="GroupMemberStatus" required>
+    Connection status: `"invited"`, `"connected"`, `"complete"`, `"removed"`, `"left"`, etc.
+  </ResponseField>
+  <ResponseField name="localDisplayName" type="string" required>
+    Display name as stored locally for this member.
+  </ResponseField>
+  <ResponseField name="memberProfile" type="LocalProfile" required>
+    The member's profile.
+  </ResponseField>
+  <ResponseField name="memberContactId" type="integer">
+    If the bot has a direct contact relationship with this member, this is the `contactId`. Otherwise absent.
+  </ResponseField>
+  <ResponseField name="activeConn" type="Connection">
+    Active connection to this member (optional).
+  </ResponseField>
+</Expandable>
+
+---
+
+## AChatItem
+
+A chat item wrapped with its chat context. This is the type in `newChatItems.chatItems`, `chatItemUpdated.chatItem`, etc.
+
+<Expandable title="AChatItem fields">
+  <ResponseField name="chatInfo" type="ChatInfo" required>
+    Identifies the chat this item belongs to. Discriminated union on `type`:
+    - `"direct"` → contains `contact`
+    - `"group"` → contains `groupInfo` (and optional `groupChatScope`)
+    - `"local"` → contains `noteFolder`
+    - `"contactRequest"` → contains `contactRequest`
+    - `"contactConnection"` → contains `contactConnection`
+  </ResponseField>
+  <ResponseField name="chatItem" type="ChatItem" required>
+    The chat item itself.
+  </ResponseField>
+</Expandable>
+
+---
+
+## ChatItem
+
+The chat item record containing message content, metadata, and file info.
+
+<Expandable title="ChatItem fields">
+  <ResponseField name="chatDir" type="CIDirection" required>
+    Message direction. Discriminated union: `"directSnd"`, `"directRcv"`, `"groupSnd"`, `"groupRcv"` (includes `groupMember`), etc.
+  </ResponseField>
+  <ResponseField name="meta" type="CIMeta" required>
+    Message metadata: `itemId`, `itemTs`, `itemText`, `itemStatus`, `itemEdited`, `itemDeleted`, `itemTimed`, etc.
+  </ResponseField>
+  <ResponseField name="content" type="CIContent" required>
+    The message content. See [CIContent variants](#cicontent) below.
+  </ResponseField>
+  <ResponseField name="formattedText" type="FormattedText[]">
+    Parsed markdown/formatting segments (optional). Each segment has `text` and an optional `format` descriptor.
+  </ResponseField>
+  <ResponseField name="quotedItem" type="CIQuote">
+    The quoted/replied-to message, if this is a reply (optional).
+  </ResponseField>
+  <ResponseField name="reactions" type="CIReactionCount[]" required>
+    Aggregated reaction counts for this message.
+  </ResponseField>
+  <ResponseField name="file" type="CIFile">
+    Attached file info (optional). Contains `fileId`, `fileName`, `fileSize`, `fileStatus`, `fileProtocol`, and `fileSource` (path on disk once received).
+  </ResponseField>
+</Expandable>
+
+---
+
+## CIContent
+
+Message content — a discriminated union on the `type` field. The most common variants are:
+
+<Expandable title="CIContent variants">
+  <ResponseField name='type: "sndMsgContent"' type="variant">
+    A text message sent by the bot. Contains `msgContent`.
+  </ResponseField>
+  <ResponseField name='type: "rcvMsgContent"' type="variant">
+    A text message received from a contact or group member. Contains `msgContent`.
+
+    `msgContent` is a [MsgContent](#msgcontent) object with these common variants:
+    - `{"type": "text", "text": "Hello"}` — plain text
+    - `{"type": "image", "text": "", "image": "<base64>"}` — image with optional caption
+    - `{"type": "video", "text": "", "image": "<thumb>", "duration": 10}` — video
+    - `{"type": "voice", "text": "", "duration": 5}` — voice message
+    - `{"type": "file", "text": "filename.pdf"}` — file attachment caption
+    - `{"type": "link", "text": "...", "preview": {...}}` — link with preview
+  </ResponseField>
+  <ResponseField name='type: "sndFileInvitation" / "rcvFileInvitation"' type="variant">
+    File transfer invitation. The file information is in `chatItem.file`.
+  </ResponseField>
+  <ResponseField name='type: "sndGroupEvent" / "rcvGroupEvent"' type="variant">
+    Group membership event (member joined, left, role changed, etc.). Contains `sndGroupEvent` / `rcvGroupEvent` with a nested discriminated union.
+  </ResponseField>
+  <ResponseField name='type: "sndCall" / "rcvCall"' type="variant">
+    Call record. Contains `status` ([CICallStatus](/bots/api-types)) and `duration` (seconds).
+  </ResponseField>
+  <ResponseField name='type: "rcvGroupInvitation" / "sndGroupInvitation"' type="variant">
+    Group invitation message. Contains `groupInvitation` and `memberRole`.
+  </ResponseField>
+  <ResponseField name='type: "rcvDeleted" / "sndDeleted"' type="variant">
+    Message was deleted. Contains `deleteMode`.
+  </ResponseField>
+  <ResponseField name='type: "rcvIntegrityError"' type="variant">
+    One or more messages were skipped (gap in message sequence). Contains `msgError`.
+  </ResponseField>
+  <ResponseField name='type: "rcvDecryptionError"' type="variant">
+    Message could not be decrypted. Contains `msgDecryptError` and `msgCount`.
+  </ResponseField>
+</Expandable>
+
+---
+
+## ChatRef
+
+Used in command parameters to identify a chat. Serialised as a string prefix + ID.
+
+<Expandable title="ChatRef fields">
+  <ResponseField name="chatType" type="ChatType" required>
+    The chat type, serialised as a prefix character:
+    - `"direct"` → `@` (e.g. `@42`)
+    - `"group"` → `#` (e.g. `#7`)
+    - `"local"` → `*` (e.g. `*1`)
+  </ResponseField>
+  <ResponseField name="chatId" type="integer" required>
+    The numeric ID of the contact, group, or note folder.
+  </ResponseField>
+  <ResponseField name="chatScope" type="GroupChatScope">
+    Optional group chat scope (only valid for groups). Currently supports `memberSupport` scope.
+  </ResponseField>
+</Expandable>
+
+**Wire format examples:**
+```
+@42          → direct chat with contactId 42
+#7           → group chat with groupId 7
+```
+
+---
+
+## AddressSettings
+
+Settings for the bot's long-term contact address. Passed to `APISetAddressSettings`.
+
+<Expandable title="AddressSettings fields">
+  <ResponseField name="businessAddress" type="boolean" required>
+    Whether this is a business address (creates a group chat per contact) rather than a regular address.
+  </ResponseField>
+  <ResponseField name="autoAccept" type="AutoAccept">
+    If present, enables automatic acceptance of contact requests. `{"acceptIncognito": false}` is the standard value.
+  </ResponseField>
+  <ResponseField name="autoReply" type="MsgContent">
+    Optional automatic reply message sent when a contact connects. E.g. `{"type": "text", "text": "Welcome!"}`.
+  </ResponseField>
+</Expandable>
+
+---
+
+## ComposedMessage
+
+Used in `APISendMessages` to describe each message in the batch.
+
+<Expandable title="ComposedMessage fields">
+  <ResponseField name="msgContent" type="MsgContent" required>
+    The message content. Most common: `{"type": "text", "text": "Hello"}`.
+  </ResponseField>
+  <ResponseField name="fileSource" type="CryptoFile">
+    Optional file to attach. `{"filePath": "/path/to/file.pdf"}` — the file must be accessible to the CLI process.
+  </ResponseField>
+  <ResponseField name="quotedItemId" type="integer">
+    Optional ID of a message to quote/reply to.
+  </ResponseField>
+  <ResponseField name="mentions" type="object">
+    Optional map of `memberName → groupMemberId` for `@mentions` in group messages.
+  </ResponseField>
+</Expandable>
+
+---
+
+## ChatError
+
+Returned as the `chatError` field in `chatCmdError` responses and `chatError` events.
+
+<Expandable title="ChatError variants">
+  <ResponseField name='type: "error"' type="variant">
+    Application-level chat error. Contains `errorType` — a [ChatErrorType](/bots/api-types) discriminated union with variants like `noActiveUser`, `contactNotReady`, `groupUserRole`, `invalidChatItemUpdate`, `fileNotFound`, etc.
+  </ResponseField>
+  <ResponseField name='type: "errorAgent"' type="variant">
+    SMP/XFTP agent error. Contains `agentError` ([AgentErrorType](/bots/api-types)), `agentConnId`, and optional `connectionEntity_`.
+  </ResponseField>
+  <ResponseField name='type: "errorStore"' type="variant">
+    Database store error. Contains `storeError` ([StoreError](/bots/api-types)) — includes variants like `contactNotFound`, `groupNotFound`, `userContactLinkNotFound`, etc.
+  </ResponseField>
+</Expandable>
+
+---
+
+## UserContactLink
+
+The bot's long-term contact address and its settings. Returned by `APIShowMyAddress`.
+
+<Expandable title="UserContactLink fields">
+  <ResponseField name="userContactLinkId" type="integer" required>
+    Internal ID of the user contact link.
+  </ResponseField>
+  <ResponseField name="connLinkContact" type="CreatedConnLink" required>
+    The actual SimpleX link. Contains `connFullLink` (always present) and `connShortLink` (optional short form).
+  </ResponseField>
+  <ResponseField name="addressSettings" type="AddressSettings" required>
+    Current address settings (auto-accept, auto-reply, business mode).
+  </ResponseField>
+</Expandable>
+
+---
+
+## GroupProfile
+
+The group's shared profile.
+
+<Expandable title="GroupProfile fields">
+  <ResponseField name="displayName" type="string" required>
+    Group display name.
+  </ResponseField>
+  <ResponseField name="fullName" type="string" required>
+    Group full name. Can be empty.
+  </ResponseField>
+  <ResponseField name="shortDescr" type="string">
+    Short description shown in group previews (optional).
+  </ResponseField>
+  <ResponseField name="description" type="string">
+    Full group description (optional).
+  </ResponseField>
+  <ResponseField name="image" type="string">
+    Base64-encoded group avatar (optional).
+  </ResponseField>
+  <ResponseField name="groupPreferences" type="GroupPreferences">
+    Optional group feature preferences (timed messages, direct messages, files, reactions, etc.).
+  </ResponseField>
+  <ResponseField name="memberAdmission" type="GroupMemberAdmission">
+    Optional member admission policy (e.g. `{"review": "all"}` for approval-required groups).
+  </ResponseField>
+</Expandable>
+
+---
+
+## SubscriptionStatus
+
+Status of a message queue subscription to an SMP server.
+
+<Expandable title="SubscriptionStatus variants">
+  <ResponseField name='type: "active"' type="variant">
+    Queue is subscribed and receiving messages.
+  </ResponseField>
+  <ResponseField name='type: "pending"' type="variant">
+    Subscription is in progress.
+  </ResponseField>
+  <ResponseField name='type: "removed"' type="variant">
+    Queue was removed from the server. Contains `subError` string.
+  </ResponseField>
+  <ResponseField name='type: "noSub"' type="variant">
+    No active subscription.
+  </ResponseField>
+</Expandable>

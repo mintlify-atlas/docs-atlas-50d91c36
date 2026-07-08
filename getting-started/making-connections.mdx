@@ -1,0 +1,122 @@
+---
+title: "How to Connect with Contacts in SimpleX Chat"
+sidebarTitle: "Making Connections"
+description: "Connect with anyone on SimpleX using one-time invitation links or a reusable SimpleX address — no phone number or username required on either side."
+---
+
+Because SimpleX Chat has no user identifiers of any kind, there is no "search by username" or "find by phone number" — connections are always formed by sharing a **link or QR code**. One side generates an invitation or address; the other side uses it to initiate the connection. Both parties then have a fully private, end-to-end encrypted conversation channel that is not tied to either person's identity.
+
+<Info>
+  Links and QR codes are safe to share over any channel — they contain only public cryptographic keys and no private data. However, an active man-in-the-middle who intercepts and substitutes the link before it is used could compromise the connection. Protect against this by verifying the **security code** with your contact after connecting (see [Security verification](#security-verification) below).
+</Info>
+
+## Connection methods
+
+SimpleX supports two ways to form a connection. Choose based on how you are sharing the link and how much spam protection you need:
+
+| | One-Time Invitation Link | SimpleX Contact Address |
+|---|---|---|
+| **Uses** | Single connection only — expires after one use | Unlimited connections until you delete it |
+| **Encryption** | Double ratchet initialised from the very first message | Standard E2E encryption; double ratchet initialises when request is accepted |
+| **Spam protection** | Highest — link is useless after one use | Can delete address at any time without losing existing contacts |
+| **Safe to share publicly** | Not recommended — anyone who intercepts it can use it | Yes — safe to post on social media, email signatures, or websites |
+| **Who knows the other party** | Both sides — you share the link directly with someone you know | Only the person using the address — the address owner sees only the connecting user's profile |
+| **Best used when** | Connecting with a specific person via another channel or in person | Allowing many people to discover and contact you |
+
+## Creating a one-time invitation link
+
+A one-time invitation link is the most private way to connect. It can be used exactly once, and the initial connection request is encrypted with the double-ratchet algorithm from the start.
+
+<Tabs>
+  <Tab title="Mobile">
+    1. Tap the **pencil icon** to open the new chat menu.
+       - **iOS**: pencil button in the top-right corner of the chat list.
+       - **Android**: floating pencil button in the bottom-right corner.
+    2. Tap **New Contact** → **Create one-time invitation link**.
+    3. A link and QR code are displayed. Share the link via any channel, or let your contact scan the QR code directly.
+    4. Optionally assign an alias to the invitation so you know who connected when the link is used (useful if your contact is in incognito mode).
+    5. Once your contact accepts, both sides are notified and the conversation opens automatically.
+  </Tab>
+  <Tab title="CLI">
+    Inside the interactive REPL, run:
+
+    ```text
+    /connect
+    ```
+
+    The CLI prints a one-time invitation link. Send this link to your contact via any channel. Your contact accepts it by running:
+
+    ```text
+    /connect <paste-invitation-link-here>
+    ```
+
+    Both sides are notified when the connection is established. You can create multiple invitations at once by running `/connect` several times, sending each link to a different person.
+
+    To display your long-term address instead of generating a one-time link, run:
+
+    ```text
+    /address
+    ```
+  </Tab>
+</Tabs>
+
+## Creating a SimpleX contact address
+
+A SimpleX contact address is an optional, reusable link that lets anyone initiate a connection with you — ideal for a public profile, email signature, or social media bio.
+
+**To create your address on mobile:**
+
+1. Go to **Settings → Your SimpleX address**.
+2. Tap **Create SimpleX address** if you do not have one yet.
+3. Share the link or QR code anywhere you like.
+
+**Auto-accept and welcome message:**
+
+From the same settings page you can:
+- Enable **auto-accept** so incoming connection requests are accepted automatically without prompting you.
+- Set a **welcome message** that is automatically sent to new contacts when the request is accepted.
+- Include your address in your **SimpleX profile**, making it visible to group members and allowing your existing contacts to share it with others.
+
+**Removing your address is always safe.** If you start receiving unwanted connection requests, delete the address. All conversations you already created via that address remain fully intact — the address is only used for the initial handshake, not for message delivery.
+
+## Accepting a connection
+
+When someone sends you a one-time invitation link, you accept it by:
+
+- **Mobile**: Tap the pencil icon → **Connect via link / QR code**, then paste the link or scan the QR code.
+- **CLI**: Run `/connect <link>`.
+
+Both sides receive a notification when the connection is established and the contact appears in the chat list.
+
+For **group links**, joining is immediate: tap the group link (or run `/connect <group-link>` in the CLI) and you are added to the group straight away without waiting for the owner to confirm.
+
+<Note>
+  You can create multiple outgoing invitations simultaneously. Each `/connect` in the CLI (or each "New Contact" tap on mobile) generates a fresh, independent link. Send each one to a different person — they cannot be cross-linked.
+</Note>
+
+## Security verification
+
+After a connection is established, SimpleX computes a **security code** — a SHA-256 cryptographic hash of the combined public keys of both parties. Verifying this code out-of-band (verbally, or via a separate trusted channel) proves that neither the link nor the keys were substituted in transit and that end-to-end encryption is secure.
+
+**To verify on mobile:**
+
+1. Open the conversation with your contact.
+2. Tap the **contact's name** at the top of the screen.
+3. Tap **Security Code**.
+4. Compare the displayed 4-digit code with your contact (via a phone call, in person, or any trusted channel). If the codes match, your connection is secure.
+
+**Why this matters:** Both link types (one-time and address) contain only public keys, so passively observing the link reveals nothing useful. But an active attacker who intercepts and replaces the link before it is used can insert themselves as a man-in-the-middle. Verifying the security code fully defeats this attack.
+
+<Note>
+  There are 2<sup>256</sup> possible security codes — approximately 1,000 times fewer than the estimated number of atoms in the visible universe. A match is cryptographically conclusive.
+</Note>
+
+## Conversation preferences
+
+After connecting, tap the contact's name to open **Conversation preferences**. Here you can configure:
+
+- **Disappearing messages** — set an expiry timer for messages in this conversation.
+- **Delete for everyone** — allow either party to delete sent messages on both sides.
+- **Voice messages** — enable or disable voice message sending.
+
+These preferences are negotiated per-conversation and do not affect any other contacts or groups.

@@ -1,0 +1,87 @@
+---
+title: "Audio and Video Calls in SimpleX Chat"
+sidebarTitle: "Calls"
+description: "SimpleX supports end-to-end encrypted audio and video calls using WebRTC with optional custom STUN/TURN servers to protect your IP address."
+---
+
+SimpleX Chat supports end-to-end encrypted audio and video calls using **WebRTC**. All call signaling — the exchange of session descriptions, ICE candidates, and cryptographic keys — flows through your existing encrypted SimpleX messaging channel rather than through a dedicated signaling server. This means that even the infrastructure facilitating the call never sees its contents.
+
+<Note>
+  Group calls are not currently supported. Calls are available between two contacts only.
+</Note>
+
+## Starting a call
+
+**Audio call:**
+1. Open a conversation with a contact.
+2. Tap the **phone icon** (📞) to the right of the contact's name at the top of the screen.
+
+**Video call:**
+1. Open a conversation with a contact.
+2. Tap the **three vertical dots** (⋮) in the top-right corner.
+3. Choose **Video call**.
+
+The recipient will see an incoming call notification and can **accept**, **reject** (silently, without notifying you), or **ignore** it (to accept later while you are still waiting). There is no timeout — the call invitation stays active as long as you remain in the call screen.
+
+## How call signaling works
+
+WebRTC requires an initial exchange of **SDP offer/answer** packets and **ICE candidates** between the two peers before the media stream is established. In most apps this signaling passes through a dedicated server, which can observe call metadata.
+
+In SimpleX:
+
+1. When you initiate a call, the SDP offer is **encrypted and sent as a regular SimpleX message** through your existing contact connection.
+2. Your contact's device decrypts it, generates an SDP answer, and sends it back through the same encrypted channel.
+3. ICE candidates are exchanged the same way.
+4. Once both peers have each other's ICE information the WebRTC media stream is established directly (peer-to-peer or via TURN relay).
+
+Because the STUN/TURN server only sees encrypted WebRTC traffic after the signaling phase, it cannot read call content. The relay server also never receives signaling packets.
+
+## STUN and TURN servers
+
+WebRTC uses two types of relay infrastructure for NAT traversal:
+
+| Server type | Role | IP visibility |
+|-------------|------|---------------|
+| **STUN** | Discovers your public IP so peers can connect directly | Your IP is visible to your contact |
+| **TURN** | Relays media packets when direct P2P fails | Your IP is hidden from your contact |
+
+SimpleX provides preset STUN/TURN servers (`stun.simplex.im` / `turn.simplex.im`) used by default. These servers can observe the **duration** of your calls but not the content.
+
+You can switch between relay and peer-to-peer modes:
+
+- **Always use relay** (default, on): media goes through TURN — your IP is hidden from your contact.
+- **Always use relay** (off): SimpleX attempts a direct P2P connection — your IP will be visible to your contact, but the preset TURN server cannot observe the call duration.
+
+## Setting a custom TURN server
+
+To use your own WebRTC ICE server:
+
+1. Open **Settings → Audio & Video calls → WebRTC ICE servers**.
+2. Toggle **Configure ICE servers** on.
+3. Enter your server addresses, one per line, in the format:
+
+```text
+turn:user:pass@turn.example.com:3478
+```
+
+4. Tap **Save**.
+
+<Info>
+  For maximum call privacy, use a self-hosted TURN server with TLS. See the WebRTC TURN server setup guide at `/server/webrtc-turn`.
+</Info>
+
+<Note>
+  WebRTC ICE server settings are stored on the current device only, not in the chat database. If you migrate your database to a new device you must reconfigure these settings manually.
+</Note>
+
+## Privacy considerations
+
+| Scenario | Your IP visible to contact? | Your IP visible to TURN server? |
+|----------|----------------------------|---------------------------------|
+| Default (preset TURN, relay on) | No | Yes (call duration only) |
+| Relay off (P2P) | Yes | No |
+| Self-hosted TURN | No | Only you control the server |
+| Self-hosted TURN + Tor (Android/Orbot) | No | Tor exit node IP only |
+
+- **With default settings**, your IP is hidden from your contact but the preset TURN server can log call duration.
+- **For maximum IP privacy**, run your own TURN server and route the connection through Tor via Orbot (see [Privacy Settings](/guide/privacy-settings)).
