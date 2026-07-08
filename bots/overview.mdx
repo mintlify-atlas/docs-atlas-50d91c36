@@ -4,7 +4,7 @@ sidebarTitle: "Overview"
 description: "SimpleX bots are first-class network participants. Connect via WebSocket JSON API and build customer support, broadcast, moderation, or LLM-powered bots."
 ---
 
-A SimpleX bot is a full participant of the SimpleX network — not a limited integration, but a complete peer. It can send and receive messages, connect to user addresses, join and manage groups, transfer files, and do everything a regular SimpleX Chat user can do. Bots run as standalone processes and communicate with the SimpleX Chat CLI over a local WebSocket connection using a simple JSON API.
+A SimpleX bot is a full participant of the SimpleX network — not a limited integration, but a complete peer. It can send and receive messages, connect to user addresses, join and manage groups, transfer files, and do everything a regular SimpleX Chat user can do. Bots run as standalone processes. The Node.js and Python SDKs embed the SimpleX library natively; for other languages, bots communicate with the SimpleX Chat CLI over a local WebSocket connection using the JSON API described below.
 
 ## How it works
 
@@ -32,7 +32,7 @@ The bot architecture has three parts: the SimpleX Chat CLI acting as a server, y
    {"resp": {"type": "newChatItems", "user": {...}, "chatItems": [...]}}
    ```
 
-Your bot maintains a map of pending `corrId` values to match responses to their commands. The TypeScript and Python SDKs handle this automatically. For most bots, the loop is simple: listen for `newChatItems` events and reply using `APISendMessages`.
+Your bot maintains a map of pending `corrId` values to match responses to their commands. The Node.js and Python SDKs handle this automatically — the Node.js SDK embeds `libsimplex` natively so no external CLI process is needed; the Python SDK offers equivalent functionality. For most bots, the loop is simple: listen for `newChatItems` events and reply using `APISendMessages`.
 
 ## Use cases
 

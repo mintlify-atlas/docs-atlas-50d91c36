@@ -1,5 +1,5 @@
 ---
-title: "SimpleX Node.js SDK Reference"
+title: "SimpleX Chat Node.js SDK Reference for Bot Builders"
 sidebarTitle: "Node.js Client"
 description: "The simplex-chat Node.js SDK provides high-level bot primitives and a native binding to libsimplex — no separate CLI process required."
 ---
@@ -138,10 +138,11 @@ type DbConfig =
 
 ```typescript
 import * as api from 'simplex-chat/api'
+import * as core from 'simplex-chat/core'
 
 const bot = await api.ChatApi.init(
   {type: 'sqlite', filePrefix: './data/bot'},
-  api.MigrationConfirmation.YesUp  // optional; default is YesUp
+  core.MigrationConfirmation.YesUp  // optional; default is YesUp
 )
 await bot.startChat()
 ```
@@ -235,25 +236,6 @@ await bot.close()       // close the database (call after stopChat)
 ```
 
 `started` and `initialized` getters reflect the current state.
-
----
-
-## Low-level client (`simplex-chat/client`)
-
-The `ChatClient` class from `simplex-chat/client` provides the same WebSocket-based transport interface as the standalone TypeScript package. When used inside the Node.js SDK it communicates with the embedded `libsimplex` via a local WebSocket. Refer to the [TypeScript Client reference](/bots/typescript-client) for the full method list.
-
-```typescript
-import {ChatClient} from 'simplex-chat/client'
-
-const chat = await ChatClient.create() // connects to local libsimplex
-
-const user = await chat.apiGetActiveUser()
-console.log('Active user:', user?.profile.displayName)
-
-for await (const event of chat.msgQ) {
-  console.log('Event:', event.type)
-}
-```
 
 ---
 

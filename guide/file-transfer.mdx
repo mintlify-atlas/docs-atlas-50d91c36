@@ -1,5 +1,5 @@
 ---
-title: "Sending Files with XFTP — SimpleX's Metadata-Private Protocol"
+title: "End-to-End Encrypted File Transfer with XFTP in SimpleX"
 sidebarTitle: "File Transfer"
 description: "SimpleX uses XFTP for file transfers: end-to-end encrypted, chunked across multiple servers, with no metadata linking sender and recipient traffic."
 ---
@@ -42,7 +42,7 @@ SimpleX uses **XFTP (eXtended File Transfer Protocol)** — a purpose-built prot
 
 ## File size limits
 
-File size is constrained by the storage available on the XFTP relay server handling the transfer. Self-hosted XFTP servers can be configured with a storage quota — the default is **1 GB per chunk set**. Files exceeding the relay's configured limit will not upload.
+File size is constrained by the storage available on the XFTP relay server handling the transfer. Self-hosted XFTP servers can be configured with a storage quota, and files exceeding the relay's configured limit will not upload.
 
 <Tip>
   Use your own XFTP server for full control over file storage quotas, retention periods, and access. See the XFTP server hosting guide for setup instructions.
@@ -51,16 +51,16 @@ File size is constrained by the storage available on the XFTP relay server handl
 ## Privacy guarantees
 
 <CardGroup cols={2}>
-  <Card title="No correlation" icon="link-slash" href="/guide/file-transfer">
+  <Card title="No correlation" icon="link-slash">
     Sender upload chunks and recipient download chunks carry no common identifiers. A relay server operator cannot determine who sent a file or who received it.
   </Card>
-  <Card title="Sender IP protection" icon="eye-slash" href="/guide/file-transfer">
+  <Card title="Sender IP protection" icon="eye-slash">
     Recipients download chunks directly from the XFTP relay — they never connect to the sender's device and cannot observe the sender's IP address.
   </Card>
-  <Card title="Temporary storage" icon="clock" href="/guide/file-transfer">
+  <Card title="Temporary storage" icon="clock">
     Files are automatically purged from relay servers after 48 hours or immediately upon cancellation. No persistent file archive is kept server-side.
   </Card>
-  <Card title="E2E encrypted" icon="lock" href="/guide/file-transfer">
+  <Card title="E2E encrypted" icon="lock">
     File content is encrypted on your device before upload using NaCl. The relay server stores and forwards only ciphertext and cannot read your files.
   </Card>
 </CardGroup>

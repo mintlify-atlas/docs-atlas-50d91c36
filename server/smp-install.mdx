@@ -1,5 +1,5 @@
 ---
-title: "Install and Initialize Your Own SMP Server"
+title: "How to Install and Initialize a SimpleX SMP Server"
 sidebarTitle: "SMP Install"
 description: "Deploy an SMP relay server using the installation script or Docker. Initialize with your domain, open required ports, and add it to your SimpleX apps."
 ---
@@ -49,7 +49,7 @@ The SMP server binary is available through three deployment paths: the official 
 
     After initialization completes, the terminal will print output similar to:
 
-    ```
+    ```text
     Certificate request self-signature ok
     subject=CN = smp1.example.com
     Server initialized, you can modify configuration in /etc/opt/simplex/smp-server.ini.
@@ -124,19 +124,19 @@ You can use your server alongside the pre-configured SimpleX servers or disable 
 
 ### Server address format
 
-```
+```text
 smp://<fingerprint>@smp.example.com
 ```
 
 If you have also configured a Tor hidden service, include both hostnames separated by a comma:
 
-```
+```text
 smp://<fingerprint>@smp.example.com,youraddress.onion
 ```
 
 To password-protect queue creation (so only people you share the address with can receive messages via your server), include the password after the fingerprint:
 
-```
+```text
 smp://<fingerprint>:<password>@smp.example.com
 ```
 

@@ -1,5 +1,5 @@
 ---
-title: "Install and Run the SimpleX Chat Terminal CLI"
+title: "Install and Run SimpleX Chat Terminal CLI on Any OS"
 sidebarTitle: "CLI Install"
 description: "Install the SimpleX terminal client on Linux, macOS, or Windows via install script, package manager, or build from source with GHC and Cabal."
 ---
@@ -128,20 +128,20 @@ The `simplex-chat` binary can run in three distinct modes depending on your use 
 
 1. **Interactive terminal REPL (default)** — Start without any flags to open the full interactive chat interface. Type `/help` inside the REPL to see all available commands.
 
-2. **Single-command mode (`--command`)** — Pass a single chat command and the process exits after executing it. Useful for scripting or cron jobs.
+2. **Single-command mode (`-e` / `--execute`)** — Pass a single chat command and the process exits after executing it. Useful for scripting or cron jobs.
 
-3. **WebSocket server mode (`-p PORT`)** — The CLI starts a WebSocket JSON API server instead of an interactive prompt. Bots and external tools connect to this port to send and receive messages programmatically.
+3. **WebSocket server mode (`-p PORT` / `--chat-server-port PORT`)** — The CLI starts a WebSocket JSON API server instead of an interactive prompt. Bots and external tools connect to this port to send and receive messages programmatically.
 
 ## Key CLI options
 
 | Flag | Description |
 |---|---|
-| `-p PORT` | Start as a WebSocket bot server listening on `PORT` |
-| `--command CMD` | Execute a single chat command and exit immediately |
-| `--store-log` | Enable logging of SMP server connection events to a file |
-| `-d PATH` / `--db-file-prefix PATH` | Set a custom path prefix for the SQLite database files |
-| `-s SERVER` | Use a custom SMP relay server (overrides built-in defaults) |
-| `-x` | Route all server connections through Tor (SOCKS5 on port 9050) |
+| `-p PORT` / `--chat-server-port PORT` | Start as a WebSocket bot server listening on `PORT` |
+| `-e CMD` / `--execute CMD` | Execute a single chat command and exit immediately |
+| `-d PATH` / `--database PATH` | Set a custom path prefix for the SQLite database files |
+| `-s SERVER` / `--server SERVER` | Use a custom SMP relay server (overrides built-in defaults) |
+| `-x` | Use local SOCKS5 proxy at port 9050 (e.g. Tor) |
+| `--socks-proxy SOCKS5` | Use SOCKS5 proxy at a custom `ipv4:port` or `:port` |
 
 Run `simplex-chat -h` to see the full list of options.
 
@@ -159,9 +159,7 @@ Once the CLI is running and you have set your display name, use these commands t
 | `/connect` or `/c` | Generate a new one-time invitation link |
 | `/connect <link>` or `/c <link>` | Accept an invitation or connect via a SimpleX address |
 | `/address` or `/ad` | Create or display your long-term contact address |
-| `/groups` | List all groups you are a member of |
-| `/create group <name>` or `/g <name>` | Create a new group |
-| `/members <group>` | List members of a group |
+| `/g <name>` | Create a new group |
 | `/file <contact> <path>` or `/f @<contact> <path>` | Send a file to a contact |
 | `@<name> <message>` | Send a message to a specific contact by name |
 | `#<group> <message>` | Send a message to a group |

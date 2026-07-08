@@ -1,7 +1,7 @@
 ---
 title: "Build a SimpleX Bot with the Python SDK"
 sidebarTitle: "Python Quickstart"
-description: "Create a SimpleX bot in Python using decorator-based message handlers. Install simplex-chat from PyPI — the native library is downloaded automatically on first run."
+description: "Build a SimpleX bot in Python with decorator-based handlers. Install simplex-chat from PyPI — the native library downloads automatically on first use."
 ---
 
 The Python SDK (`simplex-chat` on PyPI) provides a decorator-based API for message and event handling, equivalent in capability to the Node.js SDK. Register handlers with `@bot.on_message()`, `@bot.on_command()`, or `@bot.on_event()`, then call `bot.run()` to start the event loop. Wire types in `simplex_chat.types` are auto-generated from the same Haskell source as the TypeScript types, so they match exactly what the WebSocket API sends.
@@ -77,8 +77,8 @@ The SDK provides three decorator types. Handlers are matched in **first-match-wi
 | Decorator | Trigger | Callback signature |
 |---|---|---|
 | `@bot.on_message(content_type=..., text=...)` | Incoming message matching content type and/or text regex | `async def handler(msg: Message) -> None` |
-| `@bot.on_command(name)` | Slash-command (e.g. `/help`) | `async def handler(msg: Message) -> None` |
-| `@bot.on_event(tag)` | Any raw event by its `type` tag | `async def handler(event: dict) -> None` |
+| `@bot.on_command(name)` | Slash-command (e.g. `/help`) | `async def handler(msg: Message, cmd: ParsedCommand) -> None` |
+| `@bot.on_event(tag)` | Any raw event by its `type` tag | `async def handler(event: CEvt.ChatEvent) -> None` |
 
 <Note>
 Handlers are matched in registration order — place more specific handlers (e.g. exact command matches or numeric patterns) before generic catch-all handlers. The first matching handler wins; subsequent handlers for the same message are not called.

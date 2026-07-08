@@ -1,7 +1,7 @@
 ---
-title: "Install and Configure Your Own XFTP Server"
+title: "Install and Configure Your Own XFTP File Transfer Server"
 sidebarTitle: "XFTP Install"
-description: "Deploy an XFTP file server with the install script or Docker on Ubuntu. Initialize with your domain, set storage quotas, and register it in the SimpleX apps."
+description: "Deploy an XFTP server via install script or Docker on Ubuntu. Set your domain and storage quota, then register the server address in the SimpleX app."
 ---
 
 `xftp-server` is available via the same installation script as `smp-server`, or via Docker Compose. The installation script is the recommended path for most operators — it configures binaries, systemd services, and management scripts automatically on Ubuntu. Docker Compose is a good alternative if you prefer container-based deployments.
@@ -43,7 +43,7 @@ description: "Deploy an XFTP file server with the install script or Docker on Ub
 
     On success you will see output similar to:
 
-    ```
+    ```text
     SimpleX XFTP server v0.1.0
     Fingerprint: ioyYeRyy4SqJkNvb_7nM04MuLasOM4c-acVyVnqw248=
     Server address: xftp://ioyYeRyy4SqJkNvb_7nM04MuLasOM4c-acVyVnqw248=@xftp.example.com
@@ -98,13 +98,13 @@ To use your server in the SimpleX mobile or desktop app:
 2. Tap the **`+`** button to add a new server
 3. Paste your server address in the format:
 
-   ```
+   ```text
    xftp://fingerprint@xftp.example.com
    ```
 
    If you set a creation password, include it:
 
-   ```
+   ```text
    xftp://fingerprint:password@xftp.example.com
    ```
 

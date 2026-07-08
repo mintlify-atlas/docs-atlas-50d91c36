@@ -1,10 +1,10 @@
 ---
 title: "Build a SimpleX Bot with the Node.js SDK"
 sidebarTitle: "Node.js Quickstart"
-description: "Create a SimpleX bot using the Node.js SDK in under 20 lines. The SDK manages the WebSocket connection, message queuing, and TypeScript types automatically."
+description: "Create a SimpleX bot with the Node.js SDK in under 20 lines. Handles profile creation, address setup, and event dispatch with full TypeScript types."
 ---
 
-The Node.js SDK (`simplex-chat` on npm) gives you two levels of control. The high-level `bot.run()` API handles profile creation, address setup, and event dispatch in a single declarative call. The lower-level `ChatClient` class exposes the full WebSocket API — every command and event — for bots that need fine-grained control over connections, groups, files, or multiple user profiles.
+The Node.js SDK (`simplex-chat` on npm) gives you two levels of control. The high-level `bot.run()` API handles profile creation, address setup, and event dispatch in a single declarative call. The lower-level `api.ChatApi` class exposes every API command and event — for bots that need fine-grained control over connections, groups, files, or multiple user profiles.
 
 ## Prerequisites
 
@@ -36,13 +36,15 @@ simplex_backend=postgres
     ```javascript bot.js
     const {bot} = require('simplex-chat')
 
-    bot.run({
-      profile: {displayName: 'Echo Bot', fullName: ''},
-      dbOpts: {type: 'sqlite', filePrefix: './echo_bot'},
-      onMessage: async (ci, content) => {
-        await ci.reply(content.text)
-      }
-    })
+    ;(async () => {
+      const [chat] = await bot.run({
+        profile: {displayName: 'Echo Bot', fullName: ''},
+        dbOpts: {type: 'sqlite', filePrefix: './echo_bot'},
+        onMessage: async (ci, content) => {
+          await chat.apiSendTextReply(ci, content.text)
+        }
+      })
+    })()
     ```
   </Step>
   <Step title="Start the bot">
@@ -88,25 +90,27 @@ PostgreSQL prerequisites:
 ```javascript
 const {bot} = require('simplex-chat')
 
-bot.run({
-  profile: {displayName: 'Help Bot', fullName: 'Help Bot v1'},
-  dbOpts: {type: 'sqlite', filePrefix: './help_bot'},
-  options: {
-    addressSettings: {
-      welcomeMessage: 'Welcome! Type /help to see available commands.',
+;(async () => {
+  const [chat] = await bot.run({
+    profile: {displayName: 'Help Bot', fullName: 'Help Bot v1'},
+    dbOpts: {type: 'sqlite', filePrefix: './help_bot'},
+    options: {
+      addressSettings: {
+        welcomeMessage: 'Welcome! Type /help to see available commands.',
+      },
     },
-  },
-  onMessage: async (ci, content) => {
-    const text = content?.text ?? ''
-    if (text === '/help') {
-      await ci.reply('Available commands:\n/help — show this message\n/about — about this bot')
-    } else if (text === '/about') {
-      await ci.reply('Help Bot v1 — built with the SimpleX Node.js SDK.')
-    } else {
-      await ci.reply(`Unknown command. Type /help for a list of commands.`)
-    }
-  },
-})
+    onMessage: async (ci, content) => {
+      const text = content?.text ?? ''
+      if (text === '/help') {
+        await chat.apiSendTextReply(ci, 'Available commands:\n/help — show this message\n/about — about this bot')
+      } else if (text === '/about') {
+        await chat.apiSendTextReply(ci, 'Help Bot v1 — built with the SimpleX Node.js SDK.')
+      } else {
+        await chat.apiSendTextReply(ci, `Unknown command. Type /help for a list of commands.`)
+      }
+    },
+  })
+})()
 ```
 
 The `onMessage` callback receives two arguments:
@@ -116,61 +120,57 @@ The `onMessage` callback receives two arguments:
 | `ci` | `AChatItem` | The full chat item, including `chatInfo` and `chatItem.meta` |
 | `content` | `MsgContent` | Shorthand for `ci.chatItem.content.msgContent` — the message payload |
 
-The `reply` method on `ci` sends a text message back to the same chat (direct or group).
+`bot.run()` returns `[chat, user, address]`. Use `chat.apiSendTextReply(ci, text)` to reply to an incoming message (quoting it), or `chat.apiSendTextMessage(chatInfo, text)` to send without quoting.
 
-## Squaring bot: using ChatClient directly
+## Squaring bot: using ChatApi directly
 
-For full control, use `ChatClient` from `simplex-chat`. This is the underlying client used by `bot.run()` internally:
+For full control, use `api.ChatApi` from `simplex-chat`. This is the underlying client used by `bot.run()` internally. It is event-driven — subscribe handlers with `chat.on(...)` before calling `chat.startChat()`:
 
 ```javascript
-const {ChatClient} = require('simplex-chat')
-const {ChatType} = require('simplex-chat/dist/command')
-const {ciContentText, ChatInfoType} = require('simplex-chat/dist/response')
+const {api} = require('simplex-chat')
 
-async function run() {
-  const chat = await ChatClient.create('ws://localhost:5225')
-  const user = await chat.apiGetActiveUser()
-  if (!user) {
-    console.log('No user profile — create one via the CLI first')
-    return
-  }
-  console.log(`Bot: ${user.profile.displayName}`)
+;(async () => {
+  const chat = await api.ChatApi.init({type: 'sqlite', filePrefix: './squaring_bot'})
 
-  const address =
-    (await chat.apiGetUserAddress(user.userId)) ||
-    (await chat.apiCreateUserAddress(user.userId))
-  console.log(`Address: ${address}`)
-
-  await chat.enableAddressAutoAccept(user.userId)
-
-  for await (const resp of chat.msgQ) {
-    const r = resp instanceof Promise ? await resp : resp
-    if (r.type === 'contactConnected') {
+  chat.on({
+    contactConnected: async ({contact}) => {
+      console.log(`${contact.profile.displayName} connected`)
       await chat.apiSendTextMessage(
-        ChatType.Direct,
-        r.contact.contactId,
+        {type: 'direct', contact},
         'Hello! Send me a number and I will square it.'
       )
-    } else if (r.type === 'newChatItems') {
-      for (const {chatInfo, chatItem} of r.chatItems) {
-        if (chatInfo.type !== ChatInfoType.Direct) continue
-        const msg = ciContentText(chatItem.content)
+    },
+    newChatItems: async ({chatItems}) => {
+      for (const {chatInfo, chatItem} of chatItems) {
+        if (chatInfo.type !== 'direct') continue
+        if (chatItem.content.type !== 'rcvMsgContent') continue
+        const msg = chatItem.content.msgContent?.text
         if (msg) {
           const n = +msg
           const reply =
             typeof n === 'number' && !isNaN(n)
               ? `${n} * ${n} = ${n * n}`
               : 'That is not a number.'
-          await chat.apiSendTextMessage(ChatType.Direct, chatInfo.contact.contactId, reply)
+          await chat.apiSendTextMessage(chatInfo, reply)
         }
       }
-    }
-  }
-}
+    },
+  })
 
-run()
+  const user = await chat.apiGetActiveUser()
+  if (!user) throw new Error('No active user — create one via the CLI first')
+  console.log(`Bot: ${user.profile.displayName}`)
+
+  await chat.startChat()
+
+  const userId = user.userId
+  const address =
+    (await chat.apiGetUserAddress(userId)) ||
+    (await (async () => { await chat.apiCreateUserAddress(userId); return chat.apiGetUserAddress(userId) })())
+  console.log(`Address:`, address?.connLinkContact.connFullLink)
+})()
 ```
 
 <Tip>
-For advanced use cases — handling file events, group invitations, custom command routing, or managing multiple user profiles — use `ChatClient` directly. It exposes typed wrappers for every WebSocket API command. See the [Commands reference](/bots/api-commands) and [Events reference](/bots/api-events) for the full list.
+For advanced use cases — handling file events, group invitations, custom command routing, or managing multiple user profiles — use `api.ChatApi` directly. It exposes typed wrappers for every WebSocket API command. See the [Commands reference](/bots/api-commands) and [Events reference](/bots/api-events) for the full list.
 </Tip>

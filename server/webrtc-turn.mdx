@@ -25,7 +25,7 @@ Before deploying coturn, ensure you have:
   <Step title="Enable the coturn service">
     The coturn service is disabled by default. Enable it by uncommenting the relevant line in `/etc/default/coturn`:
 
-    ```
+    ```sh
     TURNSERVER_ENABLED=1
     ```
 
@@ -40,27 +40,31 @@ Before deploying coturn, ensure you have:
 
     ```conf
     # Also listen on port 443 for TLS (can bypass restrictive firewalls)
-    tls-listening-port=443
-    alt-tls-listening-port=5349
+    alt-tls-listening-port=443
     # Include fingerprints in TURN messages
     fingerprint
     # Use long-term credentials mechanism
     lt-cred-mech
     # Credentials for TURN authentication
     user=myuser:mypassword
-    # Server domain
+    # Server domain name
+    server-name=turn.example.com
+    # The default realm for users when no explicit origin/realm relationship is found
     realm=turn.example.com
     # TLS certificate and private key
     cert=/etc/letsencrypt/live/turn.example.com/fullchain.pem
     pkey=/etc/letsencrypt/live/turn.example.com/privkey.pem
     # Use a 2066-bit predefined DH TLS key
     dh2066
+    # Log to the systemd journal
+    syslog
+    # User/group which will be running the coturn service
+    proc-user=turnserver
+    proc-group=turnserver
     # Disable weak TLS versions
     no-tlsv1
     no-tlsv1_1
     no-tlsv1_2
-    # Log to the systemd journal
-    syslog
     ```
   </Step>
   <Step title="Open firewall ports">
@@ -99,7 +103,7 @@ Once coturn is running, configure the SimpleX app to use it for calls:
 2. Enable the **Configure ICE servers** toggle.
 3. Add your server addresses in the text field, one per line:
 
-   ```
+   ```text
    stun:turn.example.com:5349
    turn:myuser:mypassword@turn.example.com:443
    ```

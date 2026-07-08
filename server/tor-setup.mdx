@@ -36,14 +36,14 @@ Tor integration in SimpleX works in two complementary ways: you can expose your 
 
     Append the following lines. The single-hop routing options reduce latency at the cost of server anonymity — this is acceptable because the onion address is published alongside the clearnet address in client configurations:
 
-    ```
+    ```conf
     # Enable log so that Tor creates the onion address on first start
     Log notice file /var/log/tor/notices.log
     # Single-hop routing: reduces latency; fine when onion is paired with a public address
     SOCKSPort 0
     HiddenServiceNonAnonymousMode 1
     HiddenServiceSingleHopMode 1
-    # SMP server hidden service: directory and port mappings
+    # smp-server hidden service host directory and port mappings
     HiddenServiceDir /var/lib/tor/simplex-smp/
     HiddenServicePort 5223 localhost:5223
     HiddenServicePort 443 localhost:443
@@ -75,7 +75,7 @@ Tor integration in SimpleX works in two complementary ways: you can expose your 
   <Step title="Update smp-server.ini with the onion hostname">
     Open the SMP server configuration:
 
-    ```ini
+    ```sh
     vim /etc/opt/simplex/smp-server.ini
     ```
 
@@ -96,7 +96,7 @@ Tor integration in SimpleX works in two complementary ways: you can expose your 
 
     The server will now print both addresses on startup. The full combined server address takes the form:
 
-    ```
+    ```text
     smp://fingerprint@smp.example.com,abcdef1234567890.onion
     ```
 
@@ -121,7 +121,7 @@ SMP servers (v5.8.0 and later) support a built-in **SMP PROXY** that forwards me
 
     Replace the file contents with:
 
-    ```
+    ```conf
     # Log to systemd journal
     Log notice syslog
     # Provide a local SOCKS5 proxy on port 9050

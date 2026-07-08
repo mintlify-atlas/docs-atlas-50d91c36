@@ -1,7 +1,7 @@
 ---
-title: "SimpleX TypeScript WebSocket Client Reference"
+title: "SimpleX Chat TypeScript WebSocket Client Reference"
 sidebarTitle: "TypeScript Client"
-description: "The @simplex-chat/client package provides a low-level TypeScript WebSocket client for the SimpleX CLI server with typed commands, responses, and events."
+description: "The @simplex-chat/webrtc-client package: low-level TypeScript WebSocket client for the SimpleX CLI server with typed commands, responses, and events."
 ---
 
 The TypeScript client (`packages/simplex-chat-client/typescript`) is a low-level WebSocket client that wraps the SimpleX CLI's JSON wire protocol with TypeScript types. It connects to a running SimpleX CLI server over WebSocket, serialises commands as `{corrId, cmd}` JSON frames, correlates responses by `corrId`, and pushes unsolicited events into an async bounded queue (`ABQueue<ChatEvent>`). All chat types — commands, responses, and events — come from the companion `@simplex-chat/types` package, which is auto-generated from the Haskell source.
@@ -19,7 +19,7 @@ This package is included as part of `simplex-chat` (Node.js SDK), or can be used
 npm install simplex-chat
 ```
 
-To use the client directly without the Node.js SDK, reference the workspace package or install `@simplex-chat/client` from source.
+To use the client directly without the Node.js SDK, reference the workspace package or install `@simplex-chat/webrtc-client` from source.
 
 ## ChatClient class
 
@@ -215,7 +215,7 @@ interface ChatServer {
 The standard bot pattern is to iterate `chat.msgQ` with `for await`. The queue yields `ChatEvent` values; each event has a `type` discriminator that narrows the union:
 
 ```typescript squaring-bot.ts
-import {ChatClient} from '@simplex-chat/client'
+import {ChatClient} from '@simplex-chat/webrtc-client'
 import {ChatType} from '@simplex-chat/types'
 
 const chat = await ChatClient.create('ws://localhost:5225')

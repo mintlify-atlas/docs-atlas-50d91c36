@@ -1,7 +1,7 @@
 ---
 title: "SimpleX Security Model and Privacy Architecture"
 sidebarTitle: "Security & Privacy"
-description: "SimpleX uses double ratchet E2E encryption, TLS 1.3, NaCl crypto_box, and Ed448 signatures. Audited by Trail of Bits twice — in 2022 and 2024."
+description: "SimpleX uses layered encryption: double ratchet E2E, TLS 1.2/1.3, NaCl crypto_box, and per-queue key signing. Audited by Trail of Bits in 2022 and 2024."
 ---
 
 SimpleX Chat uses a layered security model in which multiple independent encryption mechanisms protect messages at every stage of their journey — from your device, through relay servers, to your contact's device. No single layer failure can expose your message content or reveal who you are communicating with. The architecture is designed so that even the relay servers that carry your messages cannot observe the plaintext, cannot link your sent traffic to your received traffic, and cannot identify you or your contacts. This model has been independently audited twice by Trail of Bits, a leading security research firm.
@@ -9,7 +9,7 @@ SimpleX Chat uses a layered security model in which multiple independent encrypt
 ## Encryption layers
 
 <Steps>
-  <Step title="TLS 1.3 transport encryption (client ↔ server)">
+  <Step title="TLS 1.2/1.3 transport encryption (client ↔ server)">
     All connections between SimpleX clients and SMP relay servers are protected by TLS 1.2 or TLS 1.3. The allowed cipher suites are limited to `CHACHA20POLY1305_SHA256`, with key exchange restricted to `Ed25519`/`Ed448` and `Curve25519`/`Curve448`. This provides a secure, authenticated transport channel between your app and the server.
   </Step>
   <Step title="Additional server-to-recipient encryption layer">
@@ -24,8 +24,8 @@ SimpleX Chat uses a layered security model in which multiple independent encrypt
   <Step title="NaCl crypto_box per message queue">
     Each unidirectional message queue has an additional NaCl `crypto_box` encryption layer. This layer is independent of the double ratchet and is applied per-queue, using `Curve25519` keys. It provides redundancy for future queue-level confidentiality and ensures that the same plaintext message produces different ciphertexts in different queues — preventing correlation even if a server's TLS is compromised.
   </Step>
-  <Step title="Ed448 signatures authenticate every command and message">
-    Every client command sent to a server is signed with a per-queue ephemeral key. To protect against replay attacks, SimpleX servers require a `tlsunique` channel binding as the session ID in each signed command. Additionally, message integrity is protected via digests that chain each message to the previous one, so any tampering with the message sequence is detectable.
+  <Step title="Per-queue ephemeral key signatures authenticate every command">
+    Every client command sent to a server is signed with a per-queue ephemeral key. To protect against replay attacks, SimpleX servers require a `tlsunique` channel binding as the session ID in each signed command.
   </Step>
 </Steps>
 
@@ -33,7 +33,7 @@ All message metadata — including the time a message was received by the server
 
 Content padding is applied at several levels to frustrate message-size analysis attacks, preventing an observer from inferring message content or type from packet sizes.
 
-From v6.0, all SimpleX Chat clients also use **private message routing** by default. Instead of connecting directly to a contact's server, your client instructs a known forwarding server to relay the message. The message is additionally end-to-end encrypted between your client and the destination server, so the forwarding server cannot observe the destination or the server's response. This is effectively two-hop onion packet routing, providing per-message IP address protection — stronger than the per-connection protection offered by Tor or VPN.
+From v6.0, all SimpleX Chat clients also use **private message routing** by default. Instead of connecting directly to a contact's server, your client sends messages via a known relay server, providing per-message transport anonymity. This protects your IP address from unknown messaging relays — stronger than the per-connection anonymity offered by Tor or VPN.
 
 ## Security audits
 

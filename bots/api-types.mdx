@@ -47,6 +47,9 @@ The `User` object is included in most command responses and events. The `userId`
   <ResponseField name="sendRcptsSmallGroups" type="boolean" required>
     Send read receipts in small groups.
   </ResponseField>
+  <ResponseField name="autoAcceptMemberContacts" type="boolean" required>
+    Whether the bot automatically accepts direct contact connections from group members.
+  </ResponseField>
 </Expandable>
 
 ---
@@ -77,6 +80,9 @@ The `User` object is included in most command responses and events. The `userId`
   <ResponseField name="peerType" type='"human" | "bot"'>
     Set to `"bot"` to signal that this profile belongs to a bot. Supported from v6.4.3. App UI renders bot profiles distinctly and shows command menus.
   </ResponseField>
+  <ResponseField name="badge" type="BadgeProof">
+    Optional supporter/legend/investor badge attached to this profile.
+  </ResponseField>
 </Expandable>
 
 ---
@@ -94,6 +100,9 @@ The `User` object is included in most command responses and events. The `userId`
   </ResponseField>
   <ResponseField name="fullName" type="string" required>
     Same as in Profile.
+  </ResponseField>
+  <ResponseField name="shortDescr" type="string">
+    Short description or bio (optional).
   </ResponseField>
   <ResponseField name="image" type="string">
     Base64-encoded avatar (optional).
@@ -139,9 +148,6 @@ Represents a contact in a direct conversation.
   </ResponseField>
   <ResponseField name="chatSettings" type="ChatSettings" required>
     Per-contact chat settings (notifications, read receipts, favourited).
-  </ResponseField>
-  <ResponseField name="userIsIncognito" type="boolean">
-    Whether the bot connected to this contact using an incognito profile.
   </ResponseField>
   <ResponseField name="chatItemTTL" type="integer">
     Timed message TTL for this contact (seconds, optional).
@@ -407,6 +413,12 @@ The bot's long-term contact address and its settings. Returned by `APIShowMyAddr
   </ResponseField>
   <ResponseField name="connLinkContact" type="CreatedConnLink" required>
     The actual SimpleX link. Contains `connFullLink` (always present) and `connShortLink` (optional short form).
+  </ResponseField>
+  <ResponseField name="shortLinkDataSet" type="boolean" required>
+    Whether the short link contact data has been uploaded.
+  </ResponseField>
+  <ResponseField name="shortLinkLargeDataSet" type="boolean" required>
+    Whether the large short link contact data has been uploaded.
   </ResponseField>
   <ResponseField name="addressSettings" type="AddressSettings" required>
     Current address settings (auto-accept, auto-reply, business mode).
